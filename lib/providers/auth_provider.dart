@@ -10,6 +10,7 @@ class AuthProvider extends ChangeNotifier {
   String? _username;
   String? _role;
   int? _branchId;
+  int? _userId;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -18,6 +19,7 @@ class AuthProvider extends ChangeNotifier {
   String? get username => _username;
   String? get role => _role;
   int? get branchId => _branchId;
+  int? get userId => _userId;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -35,6 +37,13 @@ class AuthProvider extends ChangeNotifier {
       _username = info['username'];
       _role = info['role'];
       _branchId = info['branchId'];
+      _userId = info['userId'];
+
+      // Session cũ chưa có userId → tự fetch lại
+      if (_userId == null && _username != null) {
+        _userId = await _authService.fetchAndCacheUserId(_username!);
+      }
+
       _status = AuthStatus.authenticated;
     } else {
       _status = AuthStatus.unauthenticated;
@@ -56,6 +65,7 @@ class AuthProvider extends ChangeNotifier {
       _username = username;
       _role = result['role'];
       _branchId = result['branchId'];
+      _userId = result['userId'];
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -73,6 +83,7 @@ class AuthProvider extends ChangeNotifier {
     _username = null;
     _role = null;
     _branchId = null;
+    _userId = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }

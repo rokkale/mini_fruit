@@ -3,16 +3,14 @@ import '../core/constants.dart';
 import '../models/order.dart';
 
 class OrderService {
-  // Lấy tất cả đơn hàng
+  // Lấy đơn hàng theo chi nhánh — backend chỉ có /orders/branch/{branchId}
   Future<List<Order>> getOrders({int? branchId}) async {
     try {
-      final response = await ApiClient.dio.get(
-        AppConstants.orders,
-        queryParameters: branchId != null ? {'branchId': branchId} : null,
-      );
-      return (response.data as List)
-          .map((e) => Order.fromJson(e))
-          .toList();
+      final endpoint = branchId != null
+          ? '${AppConstants.orders}/branch/$branchId'
+          : AppConstants.orders;
+      final response = await ApiClient.dio.get(endpoint);
+      return (response.data as List).map((e) => Order.fromJson(e)).toList();
     } catch (e) {
       throw Exception('Không thể tải danh sách đơn hàng');
     }
@@ -28,7 +26,7 @@ class OrderService {
     }
   }
 
-  // Tạo đơn hàng mới (bán hàng)
+  // Tạo đơn hàng mới — backend yêu cầu: branchId, userId, customerId, paymentMethod, discount, items
   Future<Order> createOrder(Order order) async {
     try {
       final response = await ApiClient.dio.post(

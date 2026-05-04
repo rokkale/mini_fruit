@@ -12,8 +12,8 @@ class Branch {
   });
 
   factory Branch.fromJson(Map<String, dynamic> json) => Branch(
-    id: json['id'],
-    name: json['name'],
+    id: json['branchId'] ?? json['id'],
+    name: json['branchName'] ?? json['name'],
     address: json['address'],
     phone: json['phone'],
   );

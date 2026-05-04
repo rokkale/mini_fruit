@@ -15,4 +15,5 @@ class AppConstants {
   static const String usernameKey = 'username';
   static const String roleKey = 'role';
   static const String branchIdKey = 'branch_id';
+  static const String userIdKey = 'user_id';
 }

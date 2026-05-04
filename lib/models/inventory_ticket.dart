@@ -15,14 +15,17 @@ class TicketDetail {
     this.actualQty,
   });
 
-  factory TicketDetail.fromJson(Map<String, dynamic> json) => TicketDetail(
-    detailId: json['detailId'] ?? json['detail_id'],
-    ticketId: json['ticketId'] ?? json['ticket_id'],
-    productId: json['productId'] ?? json['product_id'],
-    productName: json['productName'],
-    quantity: json['quantity'],
-    actualQty: json['actualQty'] ?? json['actual_qty'],
-  );
+  factory TicketDetail.fromJson(Map<String, dynamic> json) {
+    final product = json['product'] as Map<String, dynamic>?;
+    return TicketDetail(
+      detailId:    json['detailId'] ?? json['detail_id'],
+      ticketId:    json['ticketId'] ?? json['ticket_id'],
+      productId:   product?['productId'] ?? json['productId'] ?? json['product_id'],
+      productName: product?['productName'] ?? json['productName'],
+      quantity:    json['quantity'] ?? 0,
+      actualQty:   json['actualQty'] ?? json['actual_qty'],
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'productId': productId,
@@ -53,21 +56,24 @@ class InventoryTicket {
     this.details,
   });
 
-  factory InventoryTicket.fromJson(Map<String, dynamic> json) => InventoryTicket(
-    ticketId: json['ticketId'] ?? json['ticket_id'],
-    ticketType: json['ticketType'] ?? json['ticket_type'],
-    branchId: json['branchId'] ?? json['branch_id'],
-    branchName: json['branchName'],
-    toBranchId: json['toBranchId'] ?? json['to_branch_id'],
-    userId: json['userId'] ?? json['user_id'],
-    createdAt: json['createdAt'] ?? json['created_at'],
-    note: json['note'],
-    details: json['details'] != null
-        ? (json['details'] as List)
-        .map((e) => TicketDetail.fromJson(e))
-        .toList()
-        : null,
-  );
+  factory InventoryTicket.fromJson(Map<String, dynamic> json) {
+    final branch    = json['branch']    as Map<String, dynamic>?;
+    final toBranch  = json['toBranch']  as Map<String, dynamic>?;
+    final createdBy = json['createdBy'] as Map<String, dynamic>?;
+    return InventoryTicket(
+      ticketId:   json['ticketId'] ?? json['ticket_id'],
+      ticketType: json['ticketType'] ?? json['ticket_type'] ?? '',
+      branchId:   branch?['branchId'] ?? json['branchId'] ?? json['branch_id'] ?? 0,
+      branchName: branch?['branchName'] ?? json['branchName'],
+      toBranchId: toBranch?['branchId'] ?? json['toBranchId'] ?? json['to_branch_id'],
+      userId:     createdBy?['userId'] ?? json['userId'] ?? json['user_id'],
+      createdAt:  json['createdAt'] ?? json['created_at'],
+      note:       json['note'],
+      details:    json['details'] != null
+          ? (json['details'] as List).map((e) => TicketDetail.fromJson(e)).toList()
+          : null,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'ticketType': ticketType,

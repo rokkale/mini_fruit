@@ -61,36 +61,35 @@ class Order {
     this.details,
   });
 
-  factory Order.fromJson(Map<String, dynamic> json) => Order(
-    orderId: json['orderId'] ?? json['order_id'],
-    branchId: json['branchId'] ?? json['branch_id'],
-    branchName: json['branchName'],
-    userId: json['userId'] ?? json['user_id'],
-    customerId: json['customerId'] ?? json['customer_id'],
-    customerName: json['customerName'],
-    totalAmount: (json['totalAmount'] ?? json['total_amount'] as num).toDouble(),
-    discount: json['discount'] != null
-        ? (json['discount'] as num).toDouble()
-        : null,
-    freeAmount: json['freeAmount'] != null
-        ? (json['freeAmount'] as num).toDouble()
-        : null,
-    paymentMethod: json['paymentMethod'] ?? json['payment_method'],
-    createdAt: json['createdAt'] ?? json['created_at'],
-    details: json['details'] != null
-        ? (json['details'] as List)
-        .map((e) => OrderDetail.fromJson(e))
-        .toList()
-        : null,
-  );
+  factory Order.fromJson(Map<String, dynamic> json) {
+    // Backend trả nested objects: branch{branchId}, user{userId}, customer{customerName}
+    final branch   = json['branch']   as Map<String, dynamic>?;
+    final user     = json['user']     as Map<String, dynamic>?;
+    final customer = json['customer'] as Map<String, dynamic>?;
+    return Order(
+      orderId:      json['orderId'] ?? json['order_id'],
+      branchId:     branch?['branchId'] ?? json['branchId'] ?? json['branch_id'],
+      branchName:   branch?['branchName'] ?? json['branchName'],
+      userId:       user?['userId'] ?? json['userId'] ?? json['user_id'],
+      customerId:   customer?['customerId'] ?? json['customerId'] ?? json['customer_id'],
+      customerName: customer?['customerName'] ?? json['customerName'],
+      totalAmount:  (json['totalAmount'] ?? json['total_amount'] ?? 0 as num).toDouble(),
+      discount:     json['discount'] != null ? (json['discount'] as num).toDouble() : null,
+      freeAmount:   json['freeAmount'] != null ? (json['freeAmount'] as num).toDouble() : null,
+      paymentMethod: json['paymentMethod'] ?? json['payment_method'],
+      createdAt:    json['createdAt'] ?? json['created_at'],
+      details:      json['details'] != null
+          ? (json['details'] as List).map((e) => OrderDetail.fromJson(e)).toList()
+          : null,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'branchId': branchId,
+    'userId': userId,
     'customerId': customerId,
-    'totalAmount': totalAmount,
+    'paymentMethod': paymentMethod ?? 'CASH',
     'discount': discount ?? 0,
-    'freeAmount': freeAmount ?? totalAmount, // ← THÊM DÒNG NÀY
-    'paymentMethod': paymentMethod,
-    'details': details?.map((e) => e.toJson()).toList(),
+    'items': details?.map((e) => e.toJson()).toList(),
   };
 }

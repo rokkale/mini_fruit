@@ -7,37 +7,33 @@ class ProductService {
   Future<List<Product>> getProducts() async {
     try {
       final response = await ApiClient.dio.get(AppConstants.products);
-      return (response.data as List)
-          .map((e) => Product.fromJson(e))
-          .toList();
+      return (response.data as List).map((e) => Product.fromJson(e)).toList();
     } catch (e) {
       throw Exception('Không thể tải danh sách sản phẩm');
     }
   }
 
-  // Tìm sản phẩm theo tên
+  // Tìm sản phẩm theo tên/SKU/barcode — backend không có search param, lọc client-side
   Future<List<Product>> searchProducts(String keyword) async {
-    try {
-      final response = await ApiClient.dio.get(
-        AppConstants.products,
-        queryParameters: {'search': keyword},
-      );
-      return (response.data as List)
-          .map((e) => Product.fromJson(e))
-          .toList();
-    } catch (e) {
-      throw Exception('Không thể tìm kiếm sản phẩm');
-    }
+    final products = await getProducts();
+    final lower = keyword.toLowerCase().trim();
+    if (lower.isEmpty) return products;
+    return products.where((p) {
+      return p.productName.toLowerCase().contains(lower) ||
+          (p.sku?.toLowerCase().contains(lower) ?? false) ||
+          (p.barcode?.toLowerCase().contains(lower) ?? false);
+    }).toList();
   }
 
-  // Tìm theo barcode
+  // Tìm theo barcode — backend không có endpoint barcode, lọc client-side
   Future<Product?> getProductByBarcode(String barcode) async {
     try {
-      final response = await ApiClient.dio.get(
-        '${AppConstants.products}/barcode/$barcode',
+      final products = await getProducts();
+      return products.firstWhere(
+        (p) => p.barcode == barcode,
+        orElse: () => throw Exception('Không tìm thấy'),
       );
-      return Product.fromJson(response.data);
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }

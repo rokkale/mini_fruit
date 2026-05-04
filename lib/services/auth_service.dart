@@ -26,7 +26,22 @@ class AuthService {
         await prefs.setInt(AppConstants.branchIdKey, branchId);
       }
 
-      return {'success': true, 'role': role, 'branchId': branchId};
+      // Lấy userId từ danh sách users (backend không trả userId trong login response)
+      int? userId;
+      try {
+        final usersResp = await ApiClient.dio.get('/users');
+        final users = usersResp.data as List;
+        final me = users.firstWhere(
+          (u) => u['username'] == username,
+          orElse: () => null,
+        );
+        if (me != null) {
+          userId = me['userId'];
+          await prefs.setInt(AppConstants.userIdKey, userId!);
+        }
+      } catch (_) {}
+
+      return {'success': true, 'role': role, 'branchId': branchId, 'userId': userId};
     } catch (e) {
       return {'success': false, 'message': _handleError(e)};
     }
@@ -44,6 +59,27 @@ class AuthService {
     return prefs.getString(AppConstants.tokenKey) != null;
   }
 
+  // Lấy userId từ API nếu chưa có trong cache (session cũ chưa lưu userId)
+  Future<int?> fetchAndCacheUserId(String username) async {
+    try {
+      final response = await ApiClient.dio.get('/users');
+      final users = response.data as List;
+      final me = users.firstWhere(
+        (u) => u['username'] == username,
+        orElse: () => null,
+      );
+      if (me != null) {
+        final userId = me['userId'] as int?;
+        if (userId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(AppConstants.userIdKey, userId);
+        }
+        return userId;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // Lấy thông tin user hiện tại
   Future<Map<String, dynamic>> getCurrentUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
@@ -51,6 +87,7 @@ class AuthService {
       'username': prefs.getString(AppConstants.usernameKey),
       'role': prefs.getString(AppConstants.roleKey),
       'branchId': prefs.getInt(AppConstants.branchIdKey),
+      'userId': prefs.getInt(AppConstants.userIdKey),
     };
   }
 

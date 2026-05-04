@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/order_service.dart';
 import '../../services/product_service.dart';
+import '../../services/branch_service.dart';
 
 class OrdersScreen extends StatefulWidget {
   final bool isSale;
@@ -391,11 +392,53 @@ class _CartBottomSheetState extends State<_CartBottomSheet> {
     super.dispose();
   }
 
+  Future<int?> _pickBranch() async {
+    final branches = await BranchService().getBranches();
+    if (!mounted) return null;
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Chọn chi nhánh bán hàng'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: branches.length,
+            itemBuilder: (_, i) => ListTile(
+              title: Text(branches[i].name),
+              onTap: () => Navigator.pop(ctx, branches[i].id),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleCheckout(CartProvider cart) async {
     final auth = context.read<AuthProvider>();
-    final branchId = auth.branchId ?? 1;
+    final userId = auth.userId;
 
-    final success = await cart.checkout(branchId);
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không xác định được người dùng, vui lòng đăng nhập lại')),
+      );
+      return;
+    }
+
+    // ADMIN không có chi nhánh cố định → hỏi chọn chi nhánh
+    int? branchId = auth.branchId;
+    if (branchId == null) {
+      branchId = await _pickBranch();
+      if (branchId == null) return; // user bấm hủy
+    }
+
+    final success = await cart.checkout(branchId, userId: userId);
 
     if (!mounted) return;
 

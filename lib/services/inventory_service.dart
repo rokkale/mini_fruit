@@ -1,16 +1,20 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../models/product_stock.dart';
 import '../models/inventory_ticket.dart';
 
 class InventoryService {
-  // Lấy tồn kho theo chi nhánh
+  Future<int?> _getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(AppConstants.userIdKey);
+  }
+
+  // Lấy tồn kho theo chi nhánh — backend: GET /inventory/stock/{branchId} (path param)
   Future<List<ProductStock>> getStockByBranch(int branchId) async {
     try {
-      final response = await ApiClient.dio.get(
-        '${AppConstants.inventory}/stock',
-        queryParameters: {'branchId': branchId},
-      );
+      final response = await ApiClient.dio
+          .get('${AppConstants.inventory}/stock/$branchId');
       return (response.data as List)
           .map((e) => ProductStock.fromJson(e))
           .toList();
@@ -19,39 +23,30 @@ class InventoryService {
     }
   }
 
-  // Lấy tất cả tồn kho
+  // Backend không có endpoint GET /inventory/stock (không có branchId)
+  // ADMIN không có branchId — trả về rỗng, cần chọn chi nhánh cụ thể
   Future<List<ProductStock>> getAllStock() async {
-    try {
-      final response = await ApiClient.dio.get('${AppConstants.inventory}/stock');
-      return (response.data as List)
-          .map((e) => ProductStock.fromJson(e))
-          .toList();
-    } catch (e) {
-      throw Exception('Không thể tải tồn kho');
-    }
+    return [];
   }
 
-  // Lấy danh sách phiếu kho
+  // Backend không có endpoint GET /inventory/tickets
+  // Trả về danh sách rỗng để tránh crash
   Future<List<InventoryTicket>> getTickets({int? branchId}) async {
-    try {
-      final response = await ApiClient.dio.get(
-        '${AppConstants.inventory}/tickets',
-        queryParameters: branchId != null ? {'branchId': branchId} : null,
-      );
-      return (response.data as List)
-          .map((e) => InventoryTicket.fromJson(e))
-          .toList();
-    } catch (e) {
-      throw Exception('Không thể tải phiếu kho');
-    }
+    return [];
   }
 
-  // Tạo phiếu nhập kho
+  // Tạo phiếu nhập kho — backend: { branchId, userId, note, items }
   Future<bool> createImportTicket(InventoryTicket ticket) async {
     try {
+      final userId = ticket.userId ?? await _getUserId();
       await ApiClient.dio.post(
         '${AppConstants.inventory}/import',
-        data: ticket.toJson(),
+        data: {
+          'branchId': ticket.branchId,
+          'userId': userId,
+          'note': ticket.note ?? '',
+          'items': ticket.details?.map((e) => e.toJson()).toList(),
+        },
       );
       return true;
     } catch (e) {
@@ -59,12 +54,18 @@ class InventoryService {
     }
   }
 
-  // Tạo phiếu xuất kho
+  // Tạo phiếu xuất kho — backend: { branchId, userId, note, items }
   Future<bool> createExportTicket(InventoryTicket ticket) async {
     try {
+      final userId = ticket.userId ?? await _getUserId();
       await ApiClient.dio.post(
         '${AppConstants.inventory}/export',
-        data: ticket.toJson(),
+        data: {
+          'branchId': ticket.branchId,
+          'userId': userId,
+          'note': ticket.note ?? '',
+          'items': ticket.details?.map((e) => e.toJson()).toList(),
+        },
       );
       return true;
     } catch (e) {
@@ -72,12 +73,19 @@ class InventoryService {
     }
   }
 
-  // Chuyển kho
+  // Chuyển kho — backend: { fromBranchId, toBranchId, userId, note, items }
   Future<bool> createTransferTicket(InventoryTicket ticket) async {
     try {
+      final userId = ticket.userId ?? await _getUserId();
       await ApiClient.dio.post(
         '${AppConstants.inventory}/transfer',
-        data: ticket.toJson(),
+        data: {
+          'fromBranchId': ticket.branchId,
+          'toBranchId': ticket.toBranchId,
+          'userId': userId,
+          'note': ticket.note ?? '',
+          'items': ticket.details?.map((e) => e.toJson()).toList(),
+        },
       );
       return true;
     } catch (e) {

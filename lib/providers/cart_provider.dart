@@ -136,7 +136,7 @@ class CartProvider extends ChangeNotifier {
   }
 
   // Thanh toán
-  Future<bool> checkout(int branchId) async {
+  Future<bool> checkout(int branchId, {required int userId}) async {
     if (_items.isEmpty) {
       _errorMessage = 'Giỏ hàng trống';
       notifyListeners();
@@ -150,6 +150,7 @@ class CartProvider extends ChangeNotifier {
     try {
       final order = Order(
         branchId: branchId,
+        userId: userId,
         customerId: _customerId,
         totalAmount: totalAmount,
         discount: _discount,

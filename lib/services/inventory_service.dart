@@ -29,10 +29,18 @@ class InventoryService {
     return [];
   }
 
-  // Backend không có endpoint GET /inventory/tickets
-  // Trả về danh sách rỗng để tránh crash
   Future<List<InventoryTicket>> getTickets({int? branchId}) async {
-    return [];
+    try {
+      final response = await ApiClient.dio.get(
+        '${AppConstants.inventory}/tickets',
+        queryParameters: branchId != null ? {'branchId': branchId} : null,
+      );
+      return (response.data as List)
+          .map((e) => InventoryTicket.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw Exception('Không thể tải phiếu kho');
+    }
   }
 
   // Tạo phiếu nhập kho — backend: { branchId, userId, note, items }

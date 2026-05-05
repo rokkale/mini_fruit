@@ -8,7 +8,7 @@ import '../../models/branch.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/inventory_service.dart';
 import '../../services/branch_service.dart';
-import '../../services/product_service.dart';
+import 'inventory_create_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -90,7 +90,28 @@ class _InventoryScreenState extends State<InventoryScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateTicketDialog(context),
+        onPressed: () async {
+          final result = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => InventoryCreateScreen(
+                branches: _branches,
+                stocks: _stocks,
+              ),
+            ),
+          );
+          if (result == true) {
+            _loadData();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tạo phiếu kho thành công'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          }
+        },
         backgroundColor: AppTheme.primary,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Tạo phiếu', style: TextStyle(color: Colors.white)),
@@ -245,171 +266,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  void _showCreateTicketDialog(BuildContext context) {
-    String ticketType = 'IMPORT';
-    int? selectedBranchId = context.read<AuthProvider>().branchId;
-    int? selectedToBranchId;
-    final noteController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Tạo phiếu kho',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-
-              // Loại phiếu
-              const Text('Loại phiếu'),
-              const SizedBox(height: 8),
-              Row(
-                children: ['IMPORT', 'EXPORT', 'TRANSFER'].map((type) {
-                  final labels = {
-                    'IMPORT': 'Nhập kho',
-                    'EXPORT': 'Xuất kho',
-                    'TRANSFER': 'Chuyển kho',
-                  };
-                  final colors = {
-                    'IMPORT': Colors.green,
-                    'EXPORT': Colors.red,
-                    'TRANSFER': Colors.blue,
-                  };
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ChoiceChip(
-                        label: Text(
-                          labels[type]!,
-                          style: TextStyle(
-                            color: ticketType == type
-                                ? Colors.white
-                                : colors[type],
-                            fontSize: 12,
-                          ),
-                        ),
-                        selected: ticketType == type,
-                        selectedColor: colors[type],
-                        onSelected: (_) =>
-                            setModalState(() => ticketType = type),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-
-              // Chi nhánh
-              const Text('Chi nhánh'),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                value: selectedBranchId,
-                decoration: const InputDecoration(
-                  contentPadding:
-                  EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                hint: const Text('Chọn chi nhánh'),
-                items: _branches.map((b) => DropdownMenuItem(
-                  value: b.id,
-                  child: Text(b.name),
-                )).toList(),
-                onChanged: (v) => setModalState(() => selectedBranchId = v),
-              ),
-
-              // Chi nhánh đích (chỉ hiện khi TRANSFER)
-              if (ticketType == 'TRANSFER') ...[
-                const SizedBox(height: 12),
-                const Text('Chuyển đến chi nhánh'),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<int>(
-                  value: selectedToBranchId,
-                  decoration: const InputDecoration(
-                    contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  hint: const Text('Chọn chi nhánh đích'),
-                  items: _branches
-                      .where((b) => b.id != selectedBranchId)
-                      .map((b) => DropdownMenuItem(
-                    value: b.id,
-                    child: Text(b.name),
-                  ))
-                      .toList(),
-                  onChanged: (v) =>
-                      setModalState(() => selectedToBranchId = v),
-                ),
-              ],
-              const SizedBox(height: 12),
-
-              // Ghi chú
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Ghi chú',
-                  prefixIcon: Icon(Icons.note),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Nút tạo
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (selectedBranchId == null) return;
-                    final ticket = InventoryTicket(
-                      ticketType: ticketType,
-                      branchId: selectedBranchId!,
-                      toBranchId: selectedToBranchId,
-                      note: noteController.text.trim(),
-                      details: [],
-                    );
-                    try {
-                      if (ticketType == 'IMPORT') {
-                        await _inventoryService.createImportTicket(ticket);
-                      } else if (ticketType == 'EXPORT') {
-                        await _inventoryService.createExportTicket(ticket);
-                      } else {
-                        await _inventoryService.createTransferTicket(ticket);
-                      }
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      _loadData();
-                    } catch (e) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                e.toString().replaceAll('Exception: ', '')),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Tạo phiếu'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _TicketCard extends StatelessWidget {

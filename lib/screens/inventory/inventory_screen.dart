@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/inventory_service.dart';
 import '../../services/branch_service.dart';
 import 'inventory_create_screen.dart';
+import 'inventory_ticket_detail_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -290,50 +291,60 @@ class _TicketCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                typeLabels[ticket.ticketType] ?? ticket.ticketType,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => InventoryTicketDetailScreen(ticket: ticket),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  typeLabels[ticket.ticketType] ?? ticket.ticketType,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    ticket.branchName ?? 'Chi nhánh #${ticket.branchId}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  if (ticket.note != null && ticket.note!.isNotEmpty)
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      ticket.note!,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppTheme.textGrey),
+                      ticket.branchName ?? 'Chi nhánh #${ticket.branchId}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                  if (ticket.createdAt != null)
-                    Text(
-                      ticket.createdAt!,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppTheme.textGrey),
-                    ),
-                ],
+                    if (ticket.note != null && ticket.note!.isNotEmpty)
+                      Text(
+                        ticket.note!,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textGrey),
+                      ),
+                    if (ticket.createdAt != null)
+                      Text(
+                        ticket.createdAt!,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.textGrey),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const Icon(Icons.chevron_right, color: AppTheme.textGrey),
+            ],
+          ),
         ),
       ),
     );

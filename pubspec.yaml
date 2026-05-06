@@ -31,6 +31,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  flutter_launcher_icons: ^0.13.1
+
   # State management
   provider: ^6.1.2
 
@@ -53,3 +55,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Đảm bảo bạn đã khai báo thư mục assets ở đây để app nhận diện được ảnh
+  assets:
+    - assets/
+
+# CẤU HÌNH TẠO ICON CHO CẢ ANDROID VÀ IOS
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 21 # Dùng cho các dự án Flutter mới

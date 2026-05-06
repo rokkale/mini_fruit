@@ -9,11 +9,11 @@ import '../inventory/inventory_screen.dart';
 import '../orders/orders_screen.dart';
 import '../users/users_screen.dart';
 import '../../models/product.dart';
+import '../../models/branch.dart'; // ĐÃ THÊM IMPORT MODEL BRANCH
 import '../../services/product_service.dart';
 import '../../services/branch_service.dart';
 
 import '../shift/shift_close_screen.dart';
-// IMPORT FILE LỊCH SỬ CHỐT CA VỪA TẠO
 import '../shift/shift_history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -25,12 +25,17 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final ProductService _productService = ProductService();
+  final BranchService _branchService = BranchService(); // Khởi tạo service
   final _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
 
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   List<int?> _categories = [null];
   int? _selectedCategory;
+
+  // --- TRẠNG THÁI CHI NHÁNH ---
+  List<Branch> _branches = [];
+  Branch? _selectedBranch;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -49,8 +54,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProducts();
-    // Bật Dialog mở ca ngay sau khi màn hình được build lần đầu
+    _loadInitialData(); // Gọi hàm gộp chung load sản phẩm và chi nhánh
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowOpenShift();
     });
@@ -64,12 +69,120 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  // --- HÀM XỬ LÝ MỞ CA LÀM VIỆC ---
+  // --- TẢI DỮ LIỆU BAN ĐẦU (SẢN PHẨM & CHI NHÁNH) ---
+  Future<void> _loadInitialData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Tải song song cả sản phẩm và chi nhánh cho nhanh
+      final results = await Future.wait([
+        _productService.getProducts(),
+        _branchService.getBranches(),
+      ]);
+
+      final products = results[0] as List<Product>;
+      final branches = results[1] as List<Branch>;
+
+      final Set<int?> categoriesSet = {null};
+      for (var p in products) {
+        if (p.categoryId != null) {
+          categoriesSet.add(p.categoryId);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _filteredProducts = products;
+          _categories = categoriesSet.toList();
+          _branches = branches;
+
+          // Lấy chi nhánh mặc định của nhân viên từ AuthProvider
+          final auth = context.read<AuthProvider>();
+          if (_selectedBranch == null && auth.branchId != null) {
+            _selectedBranch = _branches.where((b) => b.id == auth.branchId).firstOrNull;
+          }
+
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Lỗi khi tải dữ liệu: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    // Giữ lại hàm này cho nút Refresh riêng lẻ
+    try {
+      final products = await _productService.getProducts();
+      setState(() {
+        _products = products;
+        _filterProducts();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi làm mới: $e')));
+    }
+  }
+
+  // --- CHỌN CHI NHÁNH ---
+  Future<void> _selectBranch() async {
+    if (_branches.isEmpty) return;
+
+    final selectedId = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Chọn chi nhánh làm việc', style: TextStyle(fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: _branches.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final branch = _branches[i];
+              final isSelected = _selectedBranch?.id == branch.id;
+              return ListTile(
+                leading: Icon(Icons.store, color: isSelected ? AppTheme.primary : Colors.grey),
+                title: Text(
+                    branch.name,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? AppTheme.primary : Colors.black87,
+                    )
+                ),
+                trailing: isSelected ? const Icon(Icons.check_circle, color: AppTheme.primary) : null,
+                onTap: () => Navigator.pop(ctx, branch.id),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+        ],
+      ),
+    );
+
+    if (selectedId != null && mounted) {
+      setState(() {
+        _selectedBranch = _branches.firstWhere((b) => b.id == selectedId);
+      });
+    }
+  }
+
   void _checkAndShowOpenShift() {
     if (!_isShiftOpen) {
       showDialog(
         context: context,
-        barrierDismissible: false, // Bắt buộc phải mở ca hoặc đăng xuất, không thể ấn ra ngoài
+        barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           title: const Row(
             children: [
@@ -98,8 +211,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(ctx); // Đóng hộp thoại mở ca
-                context.read<AuthProvider>().logout(); // Đăng xuất luôn
+                Navigator.pop(ctx);
+                context.read<AuthProvider>().logout();
               },
               child: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
             ),
@@ -121,36 +234,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       );
-    }
-  }
-
-  Future<void> _loadProducts() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final products = await _productService.getProducts();
-
-      final Set<int?> categoriesSet = {null};
-      for (var p in products) {
-        if (p.categoryId != null) {
-          categoriesSet.add(p.categoryId);
-        }
-      }
-
-      setState(() {
-        _products = products;
-        _filteredProducts = products;
-        _categories = categoriesSet.toList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Lỗi khi tải sản phẩm: $e';
-        _isLoading = false;
-      });
     }
   }
 
@@ -181,31 +264,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     cart.setDiscount(actualDiscount);
   }
 
-  Future<int?> _pickBranch() async {
-    final branches = await BranchService().getBranches();
-    if (!mounted) return null;
-    return showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Chọn chi nhánh bán hàng'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: branches.length,
-            itemBuilder: (_, i) => ListTile(
-              title: Text(branches[i].name),
-              onTap: () => Navigator.pop(ctx, branches[i].id),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleCheckout(CartProvider cart) async {
     final auth = context.read<AuthProvider>();
     final userId = auth.userId;
@@ -217,13 +275,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    int? branchId = auth.branchId;
-    if (branchId == null) {
-      branchId = await _pickBranch();
-      if (branchId == null) return;
+    // Đã thay đổi: Ưu tiên lấy ID chi nhánh đang hiển thị trên thanh AppBar
+    int? finalBranchId = _selectedBranch?.id ?? auth.branchId;
+
+    if (finalBranchId == null) {
+      // Nếu vẫn chưa có chi nhánh nào, bắt buộc chọn
+      await _selectBranch();
+      finalBranchId = _selectedBranch?.id;
+      if (finalBranchId == null) return; // Nếu user ấn hủy thì dừng thanh toán
     }
 
-    final success = await cart.checkout(branchId, userId: userId);
+    final success = await cart.checkout(finalBranchId, userId: userId);
 
     if (!mounted) return;
 
@@ -304,6 +366,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
             : const Text('Mini fruit'),
         centerTitle: false,
         actions: [
+          // HIỂN THỊ NÚT CHỌN CHI NHÁNH KHI KHÔNG TÌM KIẾM
+          if (!_isSearching)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: Center(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: _selectBranch,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.storefront, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            _selectedBranch?.name ?? 'Chọn chi nhánh',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const Icon(Icons.arrow_drop_down, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
             onPressed: () {
@@ -316,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               });
             },
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadProducts),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadInitialData),
           LayoutBuilder(
             builder: (context, constraints) {
               if (MediaQuery.of(context).size.width < 800) {
@@ -381,7 +473,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
             Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-            ElevatedButton(onPressed: _loadProducts, child: const Text('Thử lại'))
+            ElevatedButton(onPressed: _loadInitialData, child: const Text('Thử lại'))
           ],
         ),
       );
@@ -443,9 +535,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              childAspectRatio: 0.65,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 180,
+              childAspectRatio: 0.75,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
@@ -469,7 +561,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // Không cho chọn sản phẩm nếu chưa mở ca
           if (!_isShiftOpen) {
             _checkAndShowOpenShift();
             return;
@@ -833,14 +924,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onTap: () async {
               Navigator.pop(context);
 
-              // Đợi kết quả trả về từ màn hình chốt ca
               final bool? isClosed = await Navigator.push(
                 context,
-                // Truyền tiền mặt đầu ca sang
                 MaterialPageRoute(builder: (_) => ShiftCloseScreen(startingCash: _startingCash)),
               );
 
-              // Nếu chốt ca thành công (trả về true), reset state và bật lại bảng mở ca
               if (isClosed == true) {
                 setState(() {
                   _isShiftOpen = false;
@@ -870,8 +958,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final items = <Widget>[];
     if (auth.isAdmin || auth.isManager || auth.isStaff) {
       items.add(ListTile(leading: const Icon(Icons.receipt_long, color: Color(0xFF00838F)), title: const Text('Lịch sử đơn hàng'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen(isSale: false)))));
-
-      // THÊM: Nút bấm mở lịch sử bàn giao ca
       items.add(ListTile(leading: const Icon(Icons.history, color: Colors.teal), title: const Text('Lịch sử bàn giao ca'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShiftHistoryScreen()))));
     }
     if (auth.isAdmin || auth.isManager || auth.isWarehouse) {

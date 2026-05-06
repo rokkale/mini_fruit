@@ -28,6 +28,9 @@ class _UsersScreenState extends State<UsersScreen> {
   bool _isLoading = true;
   String? _error;
 
+  // Biến lưu trữ Role đang được chọn để lọc (null = hiển thị Tất cả)
+  String? _selectedRoleFilter;
+
   @override
   void initState() {
     super.initState();
@@ -54,20 +57,38 @@ class _UsersScreenState extends State<UsersScreen> {
           .toList()
           : [];
       _branches = results[1] as List<Branch>;
-      _filtered = _users;
+
+      // Thay vì gán thẳng, gọi hàm lọc để giữ nguyên trạng thái bộ lọc nếu đang có
+      _applyFilters();
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
     }
     setState(() => _isLoading = false);
   }
 
-  void _search(String keyword) {
+  // Hàm gom chung logic lọc (chữ gõ vào + nút role bấm chọn)
+  void _applyFilters() {
+    final keyword = _searchController.text.toLowerCase();
+
     setState(() {
-      _filtered = _users.where((u) =>
-      (u.username.toLowerCase().contains(keyword.toLowerCase())) ||
-          (u.fullName?.toLowerCase().contains(keyword.toLowerCase()) ?? false),
-      ).toList();
+      _filtered = _users.where((u) {
+        // Kiểm tra điều kiện Quyền (Role)
+        final matchesRole = _selectedRoleFilter == null || u.role == _selectedRoleFilter;
+
+        // Kiểm tra điều kiện chữ tìm kiếm
+        final matchesKeyword = (u.username.toLowerCase().contains(keyword)) ||
+            (u.fullName?.toLowerCase().contains(keyword) ?? false);
+
+        return matchesRole && matchesKeyword;
+      }).toList();
     });
+  }
+
+  void _onRoleFilterTapped(String? role) {
+    // Bấm lại đúng role đang chọn thì không làm gì cả
+    if (_selectedRoleFilter == role) return;
+    _selectedRoleFilter = role;
+    _applyFilters();
   }
 
   String _getBranchName(int? branchId) {
@@ -78,7 +99,6 @@ class _UsersScreenState extends State<UsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Chỉ ADMIN mới vào được màn hình này
     final auth = context.read<AuthProvider>();
     if (!auth.isAdmin) {
       return Scaffold(
@@ -112,13 +132,15 @@ class _UsersScreenState extends State<UsersScreen> {
         child: const Icon(Icons.person_add, color: Colors.white),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Thanh tìm kiếm
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
-              onChanged: _search,
+              // Cập nhật dùng _applyFilters thay vì _search
+              onChanged: (_) => _applyFilters(),
               decoration: const InputDecoration(
                 hintText: 'Tìm theo tên hoặc username...',
                 prefixIcon: Icon(Icons.search),
@@ -126,37 +148,55 @@ class _UsersScreenState extends State<UsersScreen> {
             ),
           ),
 
-          // Thống kê nhanh
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          // Thống kê nhanh & Nút Lọc (Thêm Scroll ngang chống tràn màn hình)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 _StatChip(
                   label: 'Tổng',
                   value: '${_users.length}',
                   color: AppTheme.primary,
+                  isSelected: _selectedRoleFilter == null,
+                  onTap: () => _onRoleFilterTapped(null),
                 ),
                 const SizedBox(width: 8),
                 _StatChip(
                   label: 'Admin',
                   value: '${_users.where((u) => u.role == 'ADMIN').length}',
                   color: Colors.red,
+                  isSelected: _selectedRoleFilter == 'ADMIN',
+                  onTap: () => _onRoleFilterTapped('ADMIN'),
                 ),
                 const SizedBox(width: 8),
                 _StatChip(
                   label: 'Manager',
                   value: '${_users.where((u) => u.role == 'MANAGER').length}',
                   color: Colors.orange,
+                  isSelected: _selectedRoleFilter == 'MANAGER',
+                  onTap: () => _onRoleFilterTapped('MANAGER'),
                 ),
                 const SizedBox(width: 8),
                 _StatChip(
                   label: 'Staff',
                   value: '${_users.where((u) => u.role == 'STAFF').length}',
                   color: Colors.blue,
+                  isSelected: _selectedRoleFilter == 'STAFF',
+                  onTap: () => _onRoleFilterTapped('STAFF'),
+                ),
+                const SizedBox(width: 8),
+                _StatChip(
+                  label: 'Kho',
+                  value: '${_users.where((u) => u.role == 'WAREHOUSE').length}',
+                  color: Colors.purple,
+                  isSelected: _selectedRoleFilter == 'WAREHOUSE',
+                  onTap: () => _onRoleFilterTapped('WAREHOUSE'),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 12),
 
           // Danh sách
           Expanded(child: _buildBody()),
@@ -187,7 +227,7 @@ class _UsersScreenState extends State<UsersScreen> {
       );
     }
     if (_filtered.isEmpty) {
-      return const Center(child: Text('Không có nhân viên nào'));
+      return const Center(child: Text('Không có nhân viên nào phù hợp'));
     }
 
     return RefreshIndicator(
@@ -209,6 +249,7 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   void _showUserDialog(BuildContext context, {User? user}) {
+    // CÁC LOGIC DIALOG GIỮ NGUYÊN HOÀN TOÀN NHƯ CỦA BẠN
     final isEdit = user != null;
     final usernameController =
     TextEditingController(text: isEdit ? user.username : '');
@@ -238,7 +279,6 @@ class _UsersScreenState extends State<UsersScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Username
                   TextFormField(
                     controller: usernameController,
                     enabled: !isEdit,
@@ -250,8 +290,6 @@ class _UsersScreenState extends State<UsersScreen> {
                     v!.isEmpty ? 'Không được để trống' : null,
                   ),
                   const SizedBox(height: 12),
-
-                  // Họ tên
                   TextFormField(
                     controller: fullNameController,
                     decoration: const InputDecoration(
@@ -260,8 +298,6 @@ class _UsersScreenState extends State<UsersScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Mật khẩu (bắt buộc khi thêm mới)
                   TextFormField(
                     controller: passwordController,
                     obscureText: true,
@@ -279,8 +315,6 @@ class _UsersScreenState extends State<UsersScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-
-                  // Role
                   DropdownButtonFormField<String>(
                     value: selectedRole,
                     decoration: const InputDecoration(
@@ -295,8 +329,6 @@ class _UsersScreenState extends State<UsersScreen> {
                         setDialogState(() => selectedRole = v!),
                   ),
                   const SizedBox(height: 12),
-
-                  // Chi nhánh
                   DropdownButtonFormField<int?>(
                     value: selectedBranchId,
                     decoration: const InputDecoration(
@@ -368,6 +400,7 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Future<void> _toggleStatus(BuildContext context, User user) async {
+    // GIỮ NGUYÊN LOGIC TOGGLE STATUS
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -418,6 +451,7 @@ class _UsersScreenState extends State<UsersScreen> {
 }
 
 class _UserCard extends StatelessWidget {
+  // GIỮ NGUYÊN WIDGET USER CARD NHƯ CŨ
   final User user;
   final String branchName;
   final VoidCallback onEdit;
@@ -468,7 +502,6 @@ class _UserCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Avatar
               CircleAvatar(
                 radius: 24,
                 backgroundColor: _roleColor.withOpacity(0.15),
@@ -482,8 +515,6 @@ class _UserCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-
-              // Thông tin
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,8 +581,6 @@ class _UserCard extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Menu actions
               PopupMenuButton(
                 itemBuilder: (ctx) => [
                   const PopupMenuItem(
@@ -593,41 +622,58 @@ class _UserCard extends StatelessWidget {
   }
 }
 
+// BỌC GESTURE DETECTOR VÀ THAY ĐỔI GIAO DIỆN KHI ĐƯỢC CHỌN
 class _StatChip extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   const _StatChip({
     required this.label,
     required this.value,
     required this.color,
+    required this.isSelected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: '$value ',
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          // Nổi bật toàn khối (màu solid) nếu đang được chọn, nếu không thì nền mờ nhạt
+          color: isSelected ? color : color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: isSelected
+              ? null
+              : Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: '$value ',
+                style: TextStyle(
+                  color: isSelected ? Colors.white : color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
-            ),
-            TextSpan(
-              text: label,
-              style: TextStyle(color: color, fontSize: 12),
-            ),
-          ],
+              TextSpan(
+                text: label,
+                style: TextStyle(
+                    color: isSelected ? Colors.white : color,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

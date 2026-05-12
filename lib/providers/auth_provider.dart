@@ -23,10 +23,10 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  bool get isAdmin => _role == 'ADMIN';
-  bool get isManager => _role == 'MANAGER';
-  bool get isStaff => _role == 'STAFF';
-  bool get isWarehouse => _role == 'WAREHOUSE';
+  bool get isAdmin => _role?.toUpperCase() == 'ADMIN';
+  bool get isManager => _role?.toUpperCase() == 'MANAGER';
+  bool get isStaff => _role?.toUpperCase() == 'STAFF';
+  bool get isWarehouse => _role?.toUpperCase() == 'WAREHOUSE';
   bool get isAdminOrManager => isAdmin || isManager;
 
   // Kiểm tra token khi mở app

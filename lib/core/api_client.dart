@@ -22,7 +22,6 @@ class ApiClient {
         return handler.next(options);
       },
       onError: (error, handler) {
-        // Token hết hạn → xử lý sau
         return handler.next(error);
       },
     ));

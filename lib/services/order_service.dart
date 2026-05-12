@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../models/order.dart';
@@ -34,6 +35,16 @@ class OrderService {
         data: order.toJson(),
       );
       return Order.fromJson(response.data);
+    } on DioException catch (e) {
+      // Đọc message thật từ backend response thay vì throw chung chung
+      final data = e.response?.data;
+      String message = 'Không thể tạo đơn hàng';
+      if (data is Map) {
+        message = data['message'] ?? data['error'] ?? data['msg'] ?? message;
+      } else if (data is String && data.isNotEmpty) {
+        message = data;
+      }
+      throw Exception(message);
     } catch (e) {
       throw Exception('Không thể tạo đơn hàng');
     }

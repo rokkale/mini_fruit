@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/app_widgets.dart';
 import '../../models/product_stock.dart';
 import '../../models/inventory_ticket.dart';
 import '../../models/branch.dart';
@@ -12,7 +13,11 @@ import 'inventory_create_screen.dart';
 import 'inventory_ticket_detail_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  /// readOnly = true: Staff chỉ xem tồn kho, không tạo phiếu
+  final bool readOnly;
+  final int? shiftBranchId;
+
+  const InventoryScreen({super.key, this.readOnly = false, this.shiftBranchId});
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -30,10 +35,12 @@ class _InventoryScreenState extends State<InventoryScreen>
   bool _isLoading = true;
   String? _error;
 
+  bool get _readOnly => widget.readOnly;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: _readOnly ? 1 : 2, vsync: this);
     _loadData();
   }
 
@@ -44,24 +51,35 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Future<void> _loadData() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final auth = context.read<AuthProvider>();
-      final branchId = auth.branchId;
+      // readOnly (Staff): dùng shiftBranchId; fallback auth.branchId
+      final branchId = _readOnly
+          ? (widget.shiftBranchId ?? auth.branchId)
+          : auth.branchId;
 
-      final results = await Future.wait([
-        branchId != null
-            ? _inventoryService.getStockByBranch(branchId)
-            : _inventoryService.getAllStock(),
-        branchId != null
-            ? _inventoryService.getTickets(branchId: branchId)
-            : _inventoryService.getTickets(),
-        _branchService.getBranches(),
-      ]);
-
-      _stocks = results[0] as List<ProductStock>;
-      _tickets = results[1] as List<InventoryTicket>;
-      _branches = results[2] as List<Branch>;
+      if (_readOnly) {
+        _stocks = branchId != null
+            ? await _inventoryService.getStockByBranch(branchId)
+            : [];
+      } else {
+        final results = await Future.wait([
+          branchId != null
+              ? _inventoryService.getStockByBranch(branchId)
+              : _inventoryService.getAllStock(),
+          branchId != null
+              ? _inventoryService.getTickets(branchId: branchId)
+              : _inventoryService.getTickets(),
+          _branchService.getBranches(),
+        ]);
+        _stocks = results[0] as List<ProductStock>;
+        _tickets = results[1] as List<InventoryTicket>;
+        _branches = results[2] as List<Branch>;
+      }
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
     }
@@ -72,149 +90,130 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kho hàng'),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(icon: Icon(Icons.inventory), text: 'Tồn kho'),
-            Tab(icon: Icon(Icons.receipt), text: 'Phiếu kho'),
-          ],
-        ),
+        title: Text(_readOnly ? 'Xem kho hàng' : 'Kho hàng'),
+        bottom: _readOnly
+            ? null
+            : TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Tồn kho'),
+                  Tab(icon: Icon(Icons.receipt_long_outlined), text: 'Phiếu kho'),
+                ],
+              ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadData,
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (_) => InventoryCreateScreen(
-                branches: _branches,
-                stocks: _stocks,
-              ),
+      floatingActionButton: _readOnly
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () async {
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => InventoryCreateScreen(
+                      branches: _branches,
+                      stocks: _stocks,
+                    ),
+                  ),
+                );
+                if (result == true) {
+                  _loadData();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Tạo phiếu kho thành công')),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Tạo phiếu'),
             ),
-          );
-          if (result == true) {
-            _loadData();
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Tạo phiếu kho thành công'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          }
-        },
-        backgroundColor: AppTheme.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Tạo phiếu', style: TextStyle(color: Colors.white)),
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline,
-                size: 48, color: Colors.red),
-            const SizedBox(height: 8),
-            Text(_error!),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadData,
-              child: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      )
-          : TabBarView(
-        controller: _tabController,
-        children: [
-          _buildStockTab(),
-          _buildTicketsTab(),
-        ],
-      ),
+              ? AppErrorState(message: _error!, onRetry: _loadData)
+              : _readOnly
+                  ? _buildStockTab()
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildStockTab(),
+                        _buildTicketsTab(),
+                      ],
+                    ),
     );
   }
 
-  // Tab tồn kho
   Widget _buildStockTab() {
     if (_stocks.isEmpty) {
-      return const Center(child: Text('Không có dữ liệu tồn kho'));
+      return const AppEmptyState(
+        icon: Icons.inventory_2_outlined,
+        message: 'Chưa có dữ liệu tồn kho',
+      );
     }
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        padding: const EdgeInsets.fromLTRB(
+          AppTheme.spaceMd,
+          AppTheme.spaceMd,
+          AppTheme.spaceMd,
+          80,
+        ),
         itemCount: _stocks.length,
         itemBuilder: (context, index) {
           final stock = _stocks[index];
           final isLow = stock.currentStock <= (stock.minStock ?? 10);
+          final color = isLow ? AppTheme.warning : AppTheme.primary;
+          final bgColor = isLow ? AppTheme.warningContainer : AppTheme.primaryContainer;
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: isLow
-                  ? const BorderSide(color: Colors.orange, width: 1.5)
-                  : BorderSide.none,
-            ),
+          return HoverCard(child: Card(
+            margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+            shape: isLow
+                ? RoundedRectangleBorder(
+                    borderRadius: AppTheme.roundedMd,
+                    side: BorderSide(color: AppTheme.warning.withValues(alpha: 0.5)),
+                  )
+                : null,
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppTheme.spaceMd),
               child: Row(
                 children: [
                   Container(
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: isLow
-                          ? Colors.orange.withOpacity(0.1)
-                          : AppTheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: bgColor,
+                      borderRadius: AppTheme.roundedSm,
                     ),
                     child: Icon(
-                      isLow ? Icons.warning_amber : Icons.inventory_2,
-                      color: isLow ? Colors.orange : AppTheme.primary,
+                      isLow ? Icons.warning_amber_rounded : Icons.inventory_2_outlined,
+                      color: color,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppTheme.spaceMd),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           stock.productName ?? 'Sản phẩm #${stock.productId}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
+                          style: AppTheme.titleSmall,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           stock.branchName ?? 'Chi nhánh #${stock.branchId}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textGrey,
-                          ),
+                          style: AppTheme.bodySmall,
                         ),
                         if (isLow)
-                          const Text(
-                            '⚠ Tồn kho thấp',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          Text(
+                            'Tồn kho thấp',
+                            style: AppTheme.labelLarge.copyWith(color: AppTheme.warning),
                           ),
                       ],
                     ),
@@ -226,47 +225,48 @@ class _InventoryScreenState extends State<InventoryScreen>
                         '${stock.currentStock}',
                         style: TextStyle(
                           fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: isLow ? Colors.orange : AppTheme.primary,
+                          fontWeight: FontWeight.w700,
+                          color: color,
                         ),
                       ),
                       Text(
                         'Tối thiểu: ${stock.minStock ?? 10}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textGrey,
-                        ),
+                        style: AppTheme.labelSmall,
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-          );
+          ));
         },
       ),
     );
   }
 
-  // Tab phiếu kho
   Widget _buildTicketsTab() {
     if (_tickets.isEmpty) {
-      return const Center(child: Text('Chưa có phiếu kho nào'));
+      return const AppEmptyState(
+        icon: Icons.receipt_long_outlined,
+        message: 'Chưa có phiếu kho nào',
+      );
     }
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        padding: const EdgeInsets.fromLTRB(
+          AppTheme.spaceMd,
+          AppTheme.spaceMd,
+          AppTheme.spaceMd,
+          80,
+        ),
         itemCount: _tickets.length,
-        itemBuilder: (context, index) {
-          final ticket = _tickets[index];
-          return _TicketCard(ticket: ticket);
-        },
+        itemBuilder: (context, index) =>
+            _TicketCard(ticket: _tickets[index]),
       ),
     );
   }
-
 }
 
 class _TicketCard extends StatelessWidget {
@@ -274,25 +274,31 @@ class _TicketCard extends StatelessWidget {
 
   const _TicketCard({required this.ticket});
 
+  static const _typeColors = {
+    'IMPORT': AppTheme.success,
+    'EXPORT': AppTheme.error,
+    'TRANSFER': AppTheme.info,
+  };
+  static const _typeLabels = {
+    'IMPORT': 'Nhập kho',
+    'EXPORT': 'Xuất kho',
+    'TRANSFER': 'Chuyển kho',
+  };
+  static const _typeBg = {
+    'IMPORT': AppTheme.successContainer,
+    'EXPORT': AppTheme.errorContainer,
+    'TRANSFER': AppTheme.infoContainer,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final typeColors = {
-      'IMPORT': Colors.green,
-      'EXPORT': Colors.red,
-      'TRANSFER': Colors.blue,
-    };
-    final typeLabels = {
-      'IMPORT': 'Nhập kho',
-      'EXPORT': 'Xuất kho',
-      'TRANSFER': 'Chuyển kho',
-    };
-    final color = typeColors[ticket.ticketType] ?? Colors.grey;
+    final color = _typeColors[ticket.ticketType] ?? AppTheme.textGrey;
+    final bgColor = _typeBg[ticket.ticketType] ?? AppTheme.surfaceVariant;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return HoverCard(child: Card(
+      margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppTheme.roundedMd,
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -300,53 +306,45 @@ class _TicketCard extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppTheme.spaceMd),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: bgColor,
+                  borderRadius: AppTheme.roundedSm,
                 ),
                 child: Text(
-                  typeLabels[ticket.ticketType] ?? ticket.ticketType,
+                  _typeLabels[ticket.ticketType] ?? ticket.ticketType,
                   style: TextStyle(
                     color: color,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppTheme.spaceMd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       ticket.branchName ?? 'Chi nhánh #${ticket.branchId}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: AppTheme.titleSmall,
                     ),
                     if (ticket.note != null && ticket.note!.isNotEmpty)
-                      Text(
-                        ticket.note!,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.textGrey),
-                      ),
+                      Text(ticket.note!, style: AppTheme.bodySmall),
                     if (ticket.createdAt != null)
-                      Text(
-                        ticket.createdAt!,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppTheme.textGrey),
-                      ),
+                      Text(ticket.createdAt!, style: AppTheme.labelSmall),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppTheme.textGrey),
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.textGrey),
             ],
           ),
         ),
       ),
-    );
+    ));
   }
 }

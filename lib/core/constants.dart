@@ -9,6 +9,8 @@ class AppConstants {
   static const String orders = '/orders';
   static const String users = '/users';
   static const String inventory = '/inventory';
+  static const String shifts = '/shifts';
+  static const String categories = '/categories';
 
   // SharedPreferences keys
   static const String tokenKey = 'jwt_token';
@@ -16,4 +18,10 @@ class AppConstants {
   static const String roleKey = 'role';
   static const String branchIdKey = 'branch_id';
   static const String userIdKey = 'user_id';
+
+  // Shift session keys
+  static const String shiftOpenKey = 'shift_is_open';
+  static const String shiftStartingCashKey = 'shift_starting_cash';
+  static const String shiftStartTimeKey = 'shift_start_time';
+  static const String shiftBranchIdKey = 'shift_branch_id';
 }

@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../models/product.dart';
@@ -38,11 +40,11 @@ class ProductService {
     }
   }
 
-  // Thêm sản phẩm mới
-  Future<bool> createProduct(Map<String, dynamic> data) async {
+  // Thêm sản phẩm mới — trả về Product để lấy productId upload ảnh
+  Future<Product> createProduct(Map<String, dynamic> data) async {
     try {
-      await ApiClient.dio.post(AppConstants.products, data: data);
-      return true;
+      final response = await ApiClient.dio.post(AppConstants.products, data: data);
+      return Product.fromJson(response.data);
     } catch (e) {
       throw Exception('Không thể thêm sản phẩm');
     }
@@ -65,6 +67,29 @@ class ProductService {
       return true;
     } catch (e) {
       throw Exception('Không thể xóa sản phẩm');
+    }
+  }
+
+  // Upload ảnh sản phẩm — trả về public URL đã lưu
+  // Dùng fromBytes thay fromFile để tương thích cả Web lẫn mobile
+  Future<String> uploadImage(int productId, XFile file) async {
+    try {
+      final mimeType = file.mimeType ?? 'image/jpeg';
+      final bytes = await file.readAsBytes();
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: file.name,
+          contentType: DioMediaType.parse(mimeType),
+        ),
+      });
+      final response = await ApiClient.dio.post(
+        '${AppConstants.products}/$productId/image',
+        data: formData,
+      );
+      return response.data['imageUrl'] as String;
+    } catch (e) {
+      throw Exception('Không thể upload ảnh');
     }
   }
 }

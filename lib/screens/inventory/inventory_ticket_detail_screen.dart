@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/constants.dart';
 import '../../core/theme.dart';
+import '../../core/app_widgets.dart';
 import '../../models/inventory_ticket.dart';
 
 class InventoryTicketDetailScreen extends StatefulWidget {
@@ -20,6 +21,22 @@ class _InventoryTicketDetailScreenState
   bool _loading = true;
   String? _error;
 
+  static const _typeColors = {
+    'IMPORT': AppTheme.success,
+    'EXPORT': AppTheme.error,
+    'TRANSFER': AppTheme.info,
+  };
+  static const _typeLabels = {
+    'IMPORT': 'Nhập kho',
+    'EXPORT': 'Xuất kho',
+    'TRANSFER': 'Chuyển kho',
+  };
+  static const _typeBg = {
+    'IMPORT': AppTheme.successContainer,
+    'EXPORT': AppTheme.errorContainer,
+    'TRANSFER': AppTheme.infoContainer,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -27,7 +44,10 @@ class _InventoryTicketDetailScreenState
   }
 
   Future<void> _loadDetails() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final res = await ApiClient.dio
           .get('${AppConstants.inventory}/tickets/${widget.ticket.ticketId}');
@@ -45,55 +65,38 @@ class _InventoryTicketDetailScreenState
   @override
   Widget build(BuildContext context) {
     final ticket = widget.ticket;
-    final typeColors = {
-      'IMPORT': Colors.green,
-      'EXPORT': Colors.red,
-      'TRANSFER': Colors.blue,
-    };
-    final typeLabels = {
-      'IMPORT': 'Nhập kho',
-      'EXPORT': 'Xuất kho',
-      'TRANSFER': 'Chuyển kho',
-    };
-    final color = typeColors[ticket.ticketType] ?? Colors.grey;
-    final label = typeLabels[ticket.ticketType] ?? ticket.ticketType;
+    final color = _typeColors[ticket.ticketType] ?? AppTheme.textGrey;
+    final bgColor = _typeBg[ticket.ticketType] ?? AppTheme.surfaceVariant;
+    final label = _typeLabels[ticket.ticketType] ?? ticket.ticketType;
 
     return Scaffold(
       appBar: AppBar(
         title: Text('Phiếu #${ticket.ticketId}'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadDetails),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadDetails,
+          ),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                      const SizedBox(height: 8),
-                      Text(_error!),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadDetails,
-                        child: const Text('Thử lại'),
-                      ),
-                    ],
-                  ),
-                )
+              ? AppErrorState(message: _error!, onRetry: _loadDetails)
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppTheme.spaceMd),
                   children: [
                     // Header phiếu
                     Card(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: color.withOpacity(0.4), width: 1.5),
+                        borderRadius: AppTheme.roundedMd,
+                        side: BorderSide(
+                          color: color.withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(AppTheme.spaceMd),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -103,31 +106,30 @@ class _InventoryTicketDetailScreenState
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: color,
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: bgColor,
+                                    borderRadius: AppTheme.roundedSm,
                                   ),
                                   child: Text(
                                     label,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                                    style: TextStyle(
+                                      color: color,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
                                     ),
                                   ),
                                 ),
                                 const Spacer(),
                                 Text(
                                   '#${ticket.ticketId}',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey.shade600,
+                                  style: AppTheme.titleSmall.copyWith(
+                                    color: AppTheme.textGrey,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: AppTheme.spaceMd),
                             _InfoRow(
-                              icon: Icons.store,
+                              icon: Icons.store_rounded,
                               label: ticket.ticketType == 'TRANSFER'
                                   ? 'Chi nhánh nguồn'
                                   : 'Chi nhánh',
@@ -136,24 +138,24 @@ class _InventoryTicketDetailScreenState
                             ),
                             if (ticket.ticketType == 'TRANSFER' &&
                                 ticket.toBranchId != null) ...[
-                              const SizedBox(height: 8),
+                              const SizedBox(height: AppTheme.spaceSm),
                               _InfoRow(
-                                icon: Icons.store_mall_directory,
+                                icon: Icons.store_mall_directory_outlined,
                                 label: 'Chi nhánh đích',
                                 value: 'Chi nhánh #${ticket.toBranchId}',
                               ),
                             ],
                             if (ticket.createdAt != null) ...[
-                              const SizedBox(height: 8),
+                              const SizedBox(height: AppTheme.spaceSm),
                               _InfoRow(
-                                icon: Icons.access_time,
+                                icon: Icons.access_time_rounded,
                                 label: 'Thời gian',
                                 value: ticket.createdAt!,
                               ),
                             ],
                             if (ticket.note != null &&
                                 ticket.note!.isNotEmpty) ...[
-                              const SizedBox(height: 8),
+                              const SizedBox(height: AppTheme.spaceSm),
                               _InfoRow(
                                 icon: Icons.note_alt_outlined,
                                 label: 'Ghi chú',
@@ -165,92 +167,75 @@ class _InventoryTicketDetailScreenState
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppTheme.spaceMd),
 
-                    // Danh sách sản phẩm
+                    // Tiêu đề danh sách
                     Row(
                       children: [
-                        Icon(Icons.inventory_2, size: 18, color: AppTheme.primary),
-                        const SizedBox(width: 6),
+                        Icon(Icons.inventory_2_outlined,
+                            size: 18, color: AppTheme.primary),
+                        const SizedBox(width: AppTheme.spaceXs),
                         Text(
                           'Danh sách sản phẩm (${_details.length})',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
+                          style: AppTheme.titleSmall,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppTheme.spaceSm),
 
                     if (_details.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Phiếu không có sản phẩm nào',
-                            style: TextStyle(color: Colors.grey.shade500),
-                          ),
-                        ),
+                      const AppEmptyState(
+                        icon: Icons.inventory_2_outlined,
+                        message: 'Phiếu không có sản phẩm nào',
                       )
                     else
                       ...List.generate(_details.length, (i) {
                         final d = _details[i];
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
+                          margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey.shade200),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            color: AppTheme.surface,
+                            borderRadius: AppTheme.roundedMd,
+                            border: Border.all(color: AppTheme.divider),
+                            boxShadow: AppTheme.shadowSm,
                           ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
+                                horizontal: AppTheme.spaceMd,
+                                vertical: AppTheme.spaceSm),
                             child: Row(
                               children: [
                                 CircleAvatar(
                                   radius: 18,
-                                  backgroundColor:
-                                      color.withOpacity(0.1),
+                                  backgroundColor: bgColor,
                                   child: Text(
                                     '${i + 1}',
                                     style: TextStyle(
                                       color: color,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 13,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: AppTheme.spaceMd),
                                 Expanded(
                                   child: Text(
-                                    d.productName ??
-                                        'Sản phẩm #${d.productId}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
+                                    d.productName ?? 'Sản phẩm #${d.productId}',
+                                    style: AppTheme.titleSmall,
                                   ),
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: color.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: bgColor,
+                                    borderRadius: AppTheme.roundedSm,
                                   ),
                                   child: Text(
                                     'x${d.quantity}',
                                     style: TextStyle(
                                       color: color,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 15,
                                     ),
                                   ),
@@ -283,16 +268,13 @@ class _InfoRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 16, color: AppTheme.textGrey),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppTheme.spaceSm),
         Text(
           '$label: ',
-          style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+          style: AppTheme.bodySmall,
         ),
         Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-          ),
+          child: Text(value, style: AppTheme.bodyMedium),
         ),
       ],
     );

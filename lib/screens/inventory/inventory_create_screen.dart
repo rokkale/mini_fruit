@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/app_widgets.dart';
 import '../../models/branch.dart';
 import '../../models/product.dart';
 import '../../models/product_stock.dart';
@@ -14,6 +15,23 @@ class _Item {
   int quantity;
   _Item({required this.product, this.quantity = 1});
 }
+
+// Màu theo loại phiếu (semantic)
+const _typeColors = {
+  'IMPORT': AppTheme.success,
+  'EXPORT': AppTheme.error,
+  'TRANSFER': AppTheme.info,
+};
+const _typeBg = {
+  'IMPORT': AppTheme.successContainer,
+  'EXPORT': AppTheme.errorContainer,
+  'TRANSFER': AppTheme.infoContainer,
+};
+const _typeLabels = {
+  'IMPORT': 'Nhập kho',
+  'EXPORT': 'Xuất kho',
+  'TRANSFER': 'Chuyển kho',
+};
 
 class InventoryCreateScreen extends StatefulWidget {
   final List<Branch> branches;
@@ -71,16 +89,19 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
     setState(() {
       _searchResults = lower.isEmpty
           ? _allProducts
-          : _allProducts.where((p) =>
-              p.productName.toLowerCase().contains(lower) ||
-              (p.barcode?.contains(lower) ?? false)).toList();
+          : _allProducts
+              .where((p) =>
+                  p.productName.toLowerCase().contains(lower) ||
+                  (p.barcode?.contains(lower) ?? false))
+              .toList();
     });
   }
 
   int _stockOf(int productId) {
     if (_branchId == null) return 0;
-    final s = widget.stocks.where((s) =>
-        s.productId == productId && s.branchId == _branchId).firstOrNull;
+    final s = widget.stocks
+        .where((s) => s.productId == productId && s.branchId == _branchId)
+        .firstOrNull;
     return s?.currentStock ?? 0;
   }
 
@@ -128,10 +149,12 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
         branchId: _branchId!,
         toBranchId: _toBranchId,
         note: _noteController.text.trim(),
-        details: _items.map((i) => TicketDetail(
-          productId: i.product.productId!,
-          quantity: i.quantity,
-        )).toList(),
+        details: _items
+            .map((i) => TicketDetail(
+                  productId: i.product.productId!,
+                  quantity: i.quantity,
+                ))
+            .toList(),
       );
 
       if (_ticketType == 'IMPORT') {
@@ -142,9 +165,7 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
         await _inventoryService.createTransferTicket(ticket);
       }
 
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       setState(() => _submitting = false);
       _showError(e.toString().replaceAll('Exception: ', ''));
@@ -153,58 +174,61 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      SnackBar(content: Text(msg)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final typeColors = {
-      'IMPORT': Colors.green,
-      'EXPORT': Colors.red,
-      'TRANSFER': Colors.blue,
-    };
-    final typeLabels = {
-      'IMPORT': 'Nhập kho',
-      'EXPORT': 'Xuất kho',
-      'TRANSFER': 'Chuyển kho',
-    };
-    final color = typeColors[_ticketType]!;
+    final color = _typeColors[_ticketType]!;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Tạo phiếu ${typeLabels[_ticketType]}'),
+        title: Text('Tạo phiếu ${_typeLabels[_ticketType]}'),
         actions: [
           if (_submitting)
             const Padding(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.all(AppTheme.spaceMd),
               child: SizedBox(
-                width: 20, height: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2),
               ),
             )
           else
             TextButton(
               onPressed: _submit,
-              child: const Text('Xác nhận',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Xác nhận',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
         ],
       ),
       body: Column(
         children: [
-          // Phần header phiếu
+          // Header phiếu
           Container(
-            color: Colors.grey.shade50,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            color: AppTheme.surfaceVariant,
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.spaceMd,
+              AppTheme.spaceSm,
+              AppTheme.spaceMd,
+              AppTheme.spaceMd,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Loại phiếu
+                // Chọn loại phiếu
                 Row(
                   children: ['IMPORT', 'EXPORT', 'TRANSFER'].map((type) {
                     final selected = _ticketType == type;
-                    final c = typeColors[type]!;
+                    final c = _typeColors[type]!;
+                    final bg = _typeBg[type]!;
                     return Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -214,22 +238,28 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
                             _toBranchId = null;
                           }),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: selected ? c : Colors.white,
-                              border: Border.all(color: c),
-                              borderRadius: BorderRadius.circular(8),
+                              color: selected ? c : AppTheme.surface,
+                              border: Border.all(
+                                color: selected
+                                    ? c
+                                    : c.withValues(alpha: 0.4),
+                              ),
+                              borderRadius: AppTheme.roundedSm,
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 if (selected)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: Icon(Icons.check, size: 14, color: Colors.white),
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 4),
+                                    child: Icon(Icons.check_rounded,
+                                        size: 14, color: Colors.white),
                                   ),
                                 Text(
-                                  typeLabels[type]!,
+                                  _typeLabels[type]!,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -244,40 +274,49 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppTheme.spaceSm),
 
                 // Chi nhánh
                 DropdownButtonFormField<int>(
                   value: _branchId,
                   decoration: InputDecoration(
-                    labelText: _ticketType == 'TRANSFER' ? 'Chi nhánh nguồn' : 'Chi nhánh',
-                    prefixIcon: const Icon(Icons.store),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    labelText: _ticketType == 'TRANSFER'
+                        ? 'Chi nhánh nguồn'
+                        : 'Chi nhánh',
+                    prefixIcon: const Icon(Icons.store_rounded),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
                   ),
-                  items: widget.branches.map((b) => DropdownMenuItem(
-                    value: b.id, child: Text(b.name),
-                  )).toList(),
+                  items: widget.branches
+                      .map((b) => DropdownMenuItem(
+                            value: b.id,
+                            child: Text(b.name),
+                          ))
+                      .toList(),
                   onChanged: (v) => setState(() => _branchId = v),
                 ),
 
-                // Chi nhánh đích (chỉ TRANSFER)
                 if (_ticketType == 'TRANSFER') ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppTheme.spaceSm),
                   DropdownButtonFormField<int>(
                     value: _toBranchId,
                     decoration: const InputDecoration(
                       labelText: 'Chi nhánh đích',
-                      prefixIcon: Icon(Icons.store_mall_directory),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      prefixIcon: Icon(Icons.store_mall_directory_outlined),
+                      contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                     ),
                     items: widget.branches
                         .where((b) => b.id != _branchId)
-                        .map((b) => DropdownMenuItem(value: b.id, child: Text(b.name)))
+                        .map((b) => DropdownMenuItem(
+                              value: b.id,
+                              child: Text(b.name),
+                            ))
                         .toList(),
                     onChanged: (v) => setState(() => _toBranchId = v),
                   ),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: AppTheme.spaceSm),
 
                 // Ghi chú
                 TextField(
@@ -285,45 +324,48 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Ghi chú',
                     prefixIcon: Icon(Icons.note_alt_outlined),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
               ],
             ),
           ),
 
-          // Danh sách sản phẩm đã chọn
+          // Sản phẩm đã chọn
           if (_items.isNotEmpty) _buildSelectedItems(color),
 
-          // Divider + tiêu đề tìm kiếm
+          // Tìm kiếm sản phẩm
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.spaceMd,
+              AppTheme.spaceSm,
+              AppTheme.spaceMd,
+              AppTheme.spaceXs,
+            ),
+            color: AppTheme.surface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Thêm sản phẩm',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primary,
-                  ),
+                  style: AppTheme.titleSmall.copyWith(color: AppTheme.primary),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppTheme.spaceXs),
                 TextField(
                   controller: _searchController,
                   onChanged: _search,
                   decoration: const InputDecoration(
                     hintText: 'Tìm theo tên hoặc barcode...',
-                    prefixIcon: Icon(Icons.search),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    prefixIcon: Icon(Icons.search_rounded),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                 ),
               ],
             ),
           ),
 
-          // Danh sách sản phẩm để chọn
           Expanded(child: _buildProductList()),
         ],
       ),
@@ -331,24 +373,26 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
   }
 
   Widget _buildSelectedItems(Color color) {
+    final bgColor = _typeBg[_ticketType]!;
     return Container(
-      color: color.withOpacity(0.04),
+      color: color.withValues(alpha: 0.04),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.spaceMd,
+              AppTheme.spaceSm,
+              AppTheme.spaceMd,
+              AppTheme.spaceXs,
+            ),
             child: Row(
               children: [
-                Icon(Icons.shopping_basket, size: 16, color: color),
-                const SizedBox(width: 6),
+                Icon(Icons.shopping_basket_outlined, size: 16, color: color),
+                const SizedBox(width: AppTheme.spaceXs),
                 Text(
                   'Đã chọn ${_items.length} sản phẩm',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: color,
-                  ),
+                  style: AppTheme.titleSmall.copyWith(color: color),
                 ),
               ],
             ),
@@ -361,33 +405,44 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
               final item = _items[i];
               final stock = _stockOf(item.product.productId!);
               return Container(
-                margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                margin: const EdgeInsets.fromLTRB(
+                  AppTheme.spaceSm,
+                  0,
+                  AppTheme.spaceSm,
+                  AppTheme.spaceXs,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: color.withOpacity(0.3)),
+                  color: AppTheme.surface,
+                  borderRadius: AppTheme.roundedSm,
+                  border: Border.all(color: color.withValues(alpha: 0.3)),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spaceMd,
+                    vertical: AppTheme.spaceSm,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item.product.productName,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                            Text(
+                              item.product.productName,
+                              style: AppTheme.titleSmall,
+                            ),
                             if (_ticketType != 'IMPORT')
-                              Text('Tồn kho: $stock',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              Text(
+                                'Tồn kho: $stock',
+                                style: AppTheme.labelLarge,
+                              ),
                           ],
                         ),
                       ),
-                      // Stepper số lượng
                       Row(
                         children: [
-                          _QtyButton(
-                            icon: Icons.remove,
+                          _QtyBtn(
+                            icon: Icons.remove_rounded,
                             onTap: () => _changeQty(i, -1),
                           ),
                           Container(
@@ -395,20 +450,23 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
                             alignment: Alignment.center,
                             child: Text(
                               '${item.quantity}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16),
+                              style: AppTheme.titleSmall,
                             ),
                           ),
-                          _QtyButton(
-                            icon: Icons.add,
+                          _QtyBtn(
+                            icon: Icons.add_rounded,
                             onTap: () => _changeQty(i, 1),
                           ),
                         ],
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppTheme.spaceSm),
                       GestureDetector(
                         onTap: () => _removeItem(i),
-                        child: const Icon(Icons.close, size: 18, color: Colors.red),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: AppTheme.error,
+                        ),
                       ),
                     ],
                   ),
@@ -416,7 +474,7 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
               );
             },
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppTheme.spaceXs),
         ],
       ),
     );
@@ -427,54 +485,73 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_searchResults.isEmpty) {
-      return const Center(child: Text('Không tìm thấy sản phẩm'));
+      return const AppEmptyState(
+        icon: Icons.search_off_rounded,
+        message: 'Không tìm thấy sản phẩm',
+      );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.spaceSm,
+        AppTheme.spaceXs,
+        AppTheme.spaceSm,
+        AppTheme.spaceMd,
+      ),
       itemCount: _searchResults.length,
       itemBuilder: (_, i) {
         final p = _searchResults[i];
         final added = _isAdded(p.productId!);
         final stock = _stockOf(p.productId!);
         final outOfStock =
-            (_ticketType == 'EXPORT' || _ticketType == 'TRANSFER') && stock <= 0;
+            (_ticketType == 'EXPORT' || _ticketType == 'TRANSFER') &&
+                stock <= 0;
 
         return Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.only(bottom: AppTheme.spaceXs),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.spaceMd, vertical: 2),
             leading: CircleAvatar(
-              backgroundColor: AppTheme.primary.withOpacity(0.1),
+              backgroundColor: AppTheme.primaryContainer,
               child: Text(
                 p.productName[0],
-                style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-            title: Text(p.productName,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            title: Text(p.productName, style: AppTheme.titleSmall),
             subtitle: _ticketType != 'IMPORT'
-                ? Text('Tồn: $stock',
+                ? Text(
+                    'Tồn: $stock',
                     style: TextStyle(
                       fontSize: 12,
-                      color: stock <= 0 ? Colors.red : Colors.grey.shade600,
-                    ))
+                      color: stock <= 0
+                          ? AppTheme.error
+                          : AppTheme.textGrey,
+                    ),
+                  )
                 : null,
             trailing: added
-                ? Icon(Icons.check_circle, color: AppTheme.primary)
+                ? const Icon(Icons.check_circle_rounded,
+                    color: AppTheme.primary)
                 : outOfStock
-                    ? const Text('Hết hàng',
-                        style: TextStyle(fontSize: 11, color: Colors.red))
+                    ? Text(
+                        'Hết hàng',
+                        style: AppTheme.labelLarge
+                            .copyWith(color: AppTheme.error),
+                      )
                     : ElevatedButton(
                         onPressed: () => _addProduct(p),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: const Text('Thêm',
-                            style: TextStyle(color: Colors.white, fontSize: 12)),
+                            style: TextStyle(fontSize: 12)),
                       ),
             onTap: outOfStock || added ? null : () => _addProduct(p),
           ),
@@ -484,25 +561,26 @@ class _InventoryCreateScreenState extends State<InventoryCreateScreen> {
   }
 }
 
-class _QtyButton extends StatelessWidget {
+class _QtyBtn extends StatelessWidget {
+  const _QtyBtn({required this.icon, required this.onTap});
+
   final IconData icon;
   final VoidCallback onTap;
 
-  const _QtyButton({required this.icon, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: AppTheme.roundedXs,
       child: Container(
         width: 28,
         height: 28,
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.grey.shade300),
+          color: AppTheme.surfaceVariant,
+          borderRadius: AppTheme.roundedXs,
+          border: Border.all(color: AppTheme.border),
         ),
-        child: Icon(icon, size: 16, color: Colors.black87),
+        child: Icon(icon, size: 16, color: AppTheme.textMedium),
       ),
     );
   }

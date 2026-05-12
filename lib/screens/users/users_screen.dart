@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/app_widgets.dart';
 import '../../models/user.dart';
 import '../../models/branch.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/branch_service.dart';
 
-// Tạm thời dùng Dio trực tiếp vì users cần thêm service
 import 'package:dio/dio.dart';
 import '../../core/api_client.dart';
 import '../../core/constants.dart';
@@ -27,8 +27,6 @@ class _UsersScreenState extends State<UsersScreen> {
   List<Branch> _branches = [];
   bool _isLoading = true;
   String? _error;
-
-  // Biến lưu trữ Role đang được chọn để lọc (null = hiển thị Tất cả)
   String? _selectedRoleFilter;
 
   @override
@@ -44,48 +42,46 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         ApiClient.dio.get(AppConstants.users),
         _branchService.getBranches(),
       ]);
 
+      if (!mounted) return;
       _users = (results[0] as Response).data != null
           ? ((results[0] as Response).data as List)
-          .map((e) => User.fromJson(e))
-          .toList()
+              .map((e) => User.fromJson(e))
+              .toList()
           : [];
       _branches = results[1] as List<Branch>;
-
-      // Thay vì gán thẳng, gọi hàm lọc để giữ nguyên trạng thái bộ lọc nếu đang có
       _applyFilters();
     } catch (e) {
+      if (!mounted) return;
       _error = e.toString().replaceAll('Exception: ', '');
     }
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  // Hàm gom chung logic lọc (chữ gõ vào + nút role bấm chọn)
   void _applyFilters() {
     final keyword = _searchController.text.toLowerCase();
-
     setState(() {
       _filtered = _users.where((u) {
-        // Kiểm tra điều kiện Quyền (Role)
-        final matchesRole = _selectedRoleFilter == null || u.role == _selectedRoleFilter;
-
-        // Kiểm tra điều kiện chữ tìm kiếm
-        final matchesKeyword = (u.username.toLowerCase().contains(keyword)) ||
-            (u.fullName?.toLowerCase().contains(keyword) ?? false);
-
+        final matchesRole =
+            _selectedRoleFilter == null || u.role == _selectedRoleFilter;
+        final matchesKeyword =
+            u.username.toLowerCase().contains(keyword) ||
+                (u.fullName?.toLowerCase().contains(keyword) ?? false);
         return matchesRole && matchesKeyword;
       }).toList();
     });
   }
 
   void _onRoleFilterTapped(String? role) {
-    // Bấm lại đúng role đang chọn thì không làm gì cả
     if (_selectedRoleFilter == role) return;
     _selectedRoleFilter = role;
     _applyFilters();
@@ -103,15 +99,10 @@ class _UsersScreenState extends State<UsersScreen> {
     if (!auth.isAdmin) {
       return Scaffold(
         appBar: AppBar(title: const Text('Nhân viên')),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.lock, size: 64, color: Colors.grey),
-              SizedBox(height: 8),
-              Text('Bạn không có quyền truy cập'),
-            ],
-          ),
+        body: const AppEmptyState(
+          icon: Icons.lock_outline_rounded,
+          message: 'Không có quyền truy cập',
+          description: 'Chỉ quản trị viên mới có thể xem trang này',
         ),
       );
     }
@@ -121,84 +112,80 @@ class _UsersScreenState extends State<UsersScreen> {
         title: const Text('Nhân viên'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _loadData,
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showUserDialog(context),
-        backgroundColor: AppTheme.primary,
-        child: const Icon(Icons.person_add, color: Colors.white),
+        child: const Icon(Icons.person_add_rounded),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Thanh tìm kiếm
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppTheme.spaceMd),
             child: TextField(
               controller: _searchController,
-              // Cập nhật dùng _applyFilters thay vì _search
               onChanged: (_) => _applyFilters(),
               decoration: const InputDecoration(
                 hintText: 'Tìm theo tên hoặc username...',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
           ),
 
-          // Thống kê nhanh & Nút Lọc (Thêm Scroll ngang chống tràn màn hình)
+          // Bộ lọc vai trò
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spaceMd),
             child: Row(
               children: [
-                _StatChip(
+                _RoleChip(
                   label: 'Tổng',
-                  value: '${_users.length}',
+                  count: _users.length,
                   color: AppTheme.primary,
                   isSelected: _selectedRoleFilter == null,
                   onTap: () => _onRoleFilterTapped(null),
                 ),
-                const SizedBox(width: 8),
-                _StatChip(
+                const SizedBox(width: AppTheme.spaceSm),
+                _RoleChip(
                   label: 'Admin',
-                  value: '${_users.where((u) => u.role == 'ADMIN').length}',
-                  color: Colors.red,
+                  count: _users.where((u) => u.role == 'ADMIN').length,
+                  color: AppTheme.error,
                   isSelected: _selectedRoleFilter == 'ADMIN',
                   onTap: () => _onRoleFilterTapped('ADMIN'),
                 ),
-                const SizedBox(width: 8),
-                _StatChip(
+                const SizedBox(width: AppTheme.spaceSm),
+                _RoleChip(
                   label: 'Manager',
-                  value: '${_users.where((u) => u.role == 'MANAGER').length}',
-                  color: Colors.orange,
+                  count: _users.where((u) => u.role == 'MANAGER').length,
+                  color: AppTheme.warning,
                   isSelected: _selectedRoleFilter == 'MANAGER',
                   onTap: () => _onRoleFilterTapped('MANAGER'),
                 ),
-                const SizedBox(width: 8),
-                _StatChip(
+                const SizedBox(width: AppTheme.spaceSm),
+                _RoleChip(
                   label: 'Staff',
-                  value: '${_users.where((u) => u.role == 'STAFF').length}',
-                  color: Colors.blue,
+                  count: _users.where((u) => u.role == 'STAFF').length,
+                  color: AppTheme.info,
                   isSelected: _selectedRoleFilter == 'STAFF',
                   onTap: () => _onRoleFilterTapped('STAFF'),
                 ),
-                const SizedBox(width: 8),
-                _StatChip(
+                const SizedBox(width: AppTheme.spaceSm),
+                _RoleChip(
                   label: 'Kho',
-                  value: '${_users.where((u) => u.role == 'WAREHOUSE').length}',
-                  color: Colors.purple,
+                  count: _users.where((u) => u.role == 'WAREHOUSE').length,
+                  color: const Color(0xFF6A1B9A),
                   isSelected: _selectedRoleFilter == 'WAREHOUSE',
                   onTap: () => _onRoleFilterTapped('WAREHOUSE'),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppTheme.spaceSm),
 
-          // Danh sách
           Expanded(child: _buildBody()),
         ],
       ),
@@ -206,34 +193,26 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 8),
-            Text(_error!),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadData,
-              child: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      );
+      return AppErrorState(message: _error!, onRetry: _loadData);
     }
     if (_filtered.isEmpty) {
-      return const Center(child: Text('Không có nhân viên nào phù hợp'));
+      return const AppEmptyState(
+        icon: Icons.people_outline_rounded,
+        message: 'Không có nhân viên nào phù hợp',
+      );
     }
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        padding: const EdgeInsets.fromLTRB(
+          AppTheme.spaceMd,
+          0,
+          AppTheme.spaceMd,
+          80,
+        ),
         itemCount: _filtered.length,
         itemBuilder: (context, index) {
           final user = _filtered[index];
@@ -249,19 +228,18 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   void _showUserDialog(BuildContext context, {User? user}) {
-    // CÁC LOGIC DIALOG GIỮ NGUYÊN HOÀN TOÀN NHƯ CỦA BẠN
     final isEdit = user != null;
-    final usernameController =
-    TextEditingController(text: isEdit ? user.username : '');
-    final fullNameController =
-    TextEditingController(text: isEdit ? user.fullName ?? '' : '');
-    final passwordController = TextEditingController();
+    final usernameCtrl =
+        TextEditingController(text: isEdit ? user.username : '');
+    final fullNameCtrl =
+        TextEditingController(text: isEdit ? user.fullName ?? '' : '');
+    final passwordCtrl = TextEditingController();
     String selectedRole = isEdit ? (user.role ?? 'STAFF') : 'STAFF';
     int? selectedBranchId = isEdit ? user.branchId : null;
     final formKey = GlobalKey<FormState>();
 
-    final roles = ['ADMIN', 'MANAGER', 'STAFF', 'WAREHOUSE'];
-    final roleLabels = {
+    const roles = ['ADMIN', 'MANAGER', 'STAFF', 'WAREHOUSE'];
+    const roleLabels = {
       'ADMIN': 'Quản trị viên',
       'MANAGER': 'Quản lý',
       'STAFF': 'Nhân viên bán hàng',
@@ -280,32 +258,32 @@ class _UsersScreenState extends State<UsersScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
-                    controller: usernameController,
+                    controller: usernameCtrl,
                     enabled: !isEdit,
                     decoration: const InputDecoration(
                       labelText: 'Tên đăng nhập *',
-                      prefixIcon: Icon(Icons.person),
+                      prefixIcon: Icon(Icons.person_outline_rounded),
                     ),
                     validator: (v) =>
-                    v!.isEmpty ? 'Không được để trống' : null,
+                        v!.isEmpty ? 'Không được để trống' : null,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTheme.spaceSm),
                   TextFormField(
-                    controller: fullNameController,
+                    controller: fullNameCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Họ và tên',
-                      prefixIcon: Icon(Icons.badge),
+                      prefixIcon: Icon(Icons.badge_outlined),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTheme.spaceSm),
                   TextFormField(
-                    controller: passwordController,
+                    controller: passwordCtrl,
                     obscureText: true,
                     decoration: InputDecoration(
                       labelText: isEdit
                           ? 'Mật khẩu mới (để trống nếu không đổi)'
                           : 'Mật khẩu *',
-                      prefixIcon: const Icon(Icons.lock),
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
                     ),
                     validator: (v) {
                       if (!isEdit && (v == null || v.isEmpty)) {
@@ -314,26 +292,28 @@ class _UsersScreenState extends State<UsersScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTheme.spaceSm),
                   DropdownButtonFormField<String>(
                     value: selectedRole,
                     decoration: const InputDecoration(
                       labelText: 'Vai trò *',
-                      prefixIcon: Icon(Icons.security),
+                      prefixIcon: Icon(Icons.security_outlined),
                     ),
-                    items: roles.map((r) => DropdownMenuItem(
-                      value: r,
-                      child: Text(roleLabels[r]!),
-                    )).toList(),
+                    items: roles
+                        .map((r) => DropdownMenuItem(
+                              value: r,
+                              child: Text(roleLabels[r]!),
+                            ))
+                        .toList(),
                     onChanged: (v) =>
                         setDialogState(() => selectedRole = v!),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppTheme.spaceSm),
                   DropdownButtonFormField<int?>(
                     value: selectedBranchId,
                     decoration: const InputDecoration(
                       labelText: 'Chi nhánh',
-                      prefixIcon: Icon(Icons.store),
+                      prefixIcon: Icon(Icons.store_rounded),
                     ),
                     items: [
                       const DropdownMenuItem(
@@ -341,9 +321,9 @@ class _UsersScreenState extends State<UsersScreen> {
                         child: Text('Tất cả chi nhánh'),
                       ),
                       ..._branches.map((b) => DropdownMenuItem(
-                        value: b.id,
-                        child: Text(b.name),
-                      )),
+                            value: b.id,
+                            child: Text(b.name),
+                          )),
                     ],
                     onChanged: (v) =>
                         setDialogState(() => selectedBranchId = v),
@@ -361,12 +341,12 @@ class _UsersScreenState extends State<UsersScreen> {
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 final data = {
-                  'username': usernameController.text.trim(),
-                  'fullName': fullNameController.text.trim(),
+                  'username': usernameCtrl.text.trim(),
+                  'fullName': fullNameCtrl.text.trim(),
                   'role': selectedRole,
                   'branchId': selectedBranchId,
-                  if (passwordController.text.isNotEmpty)
-                    'password': passwordController.text,
+                  if (passwordCtrl.text.isNotEmpty)
+                    'password': passwordCtrl.text,
                 };
                 try {
                   if (isEdit) {
@@ -385,7 +365,6 @@ class _UsersScreenState extends State<UsersScreen> {
                       SnackBar(
                         content: Text(
                             e.toString().replaceAll('Exception: ', '')),
-                        backgroundColor: Colors.red,
                       ),
                     );
                   }
@@ -400,14 +379,13 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Future<void> _toggleStatus(BuildContext context, User user) async {
-    // GIỮ NGUYÊN LOGIC TOGGLE STATUS
+    final isActive = user.status ?? true;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(
-            (user.status ?? true) ? 'Vô hiệu hóa tài khoản' : 'Kích hoạt tài khoản'),
+        title: Text(isActive ? 'Vô hiệu hóa tài khoản' : 'Kích hoạt tài khoản'),
         content: Text(
-          (user.status ?? true)
+          isActive
               ? 'Vô hiệu hóa tài khoản "${user.username}"?'
               : 'Kích hoạt tài khoản "${user.username}"?',
         ),
@@ -418,11 +396,10 @@ class _UsersScreenState extends State<UsersScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-              (user.status ?? true) ? Colors.red : Colors.green,
+              backgroundColor: isActive ? AppTheme.error : AppTheme.success,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text((user.status ?? true) ? 'Vô hiệu hóa' : 'Kích hoạt'),
+            child: Text(isActive ? 'Vô hiệu hóa' : 'Kích hoạt'),
           ),
         ],
       ),
@@ -432,16 +409,14 @@ class _UsersScreenState extends State<UsersScreen> {
       try {
         await ApiClient.dio.patch(
           '${AppConstants.users}/${user.userId}/status',
-          data: {'status': !(user.status ?? true)},
+          data: {'status': !isActive},
         );
         _loadData();
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-              Text(e.toString().replaceAll('Exception: ', '')),
-              backgroundColor: Colors.red,
+              content: Text(e.toString().replaceAll('Exception: ', '')),
             ),
           );
         }
@@ -450,8 +425,10 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 }
 
+// ─────────────────────────────────────────
+// USER CARD
+// ─────────────────────────────────────────
 class _UserCard extends StatelessWidget {
-  // GIỮ NGUYÊN WIDGET USER CARD NHƯ CŨ
   final User user;
   final String branchName;
   final VoidCallback onEdit;
@@ -466,21 +443,31 @@ class _UserCard extends StatelessWidget {
 
   Color get _roleColor {
     switch (user.role) {
-      case 'ADMIN': return Colors.red;
-      case 'MANAGER': return Colors.orange;
-      case 'STAFF': return Colors.blue;
-      case 'WAREHOUSE': return Colors.purple;
-      default: return Colors.grey;
+      case 'ADMIN':
+        return AppTheme.error;
+      case 'MANAGER':
+        return AppTheme.warning;
+      case 'STAFF':
+        return AppTheme.info;
+      case 'WAREHOUSE':
+        return const Color(0xFF6A1B9A);
+      default:
+        return AppTheme.textGrey;
     }
   }
 
   String get _roleLabel {
     switch (user.role) {
-      case 'ADMIN': return 'Quản trị viên';
-      case 'MANAGER': return 'Quản lý';
-      case 'STAFF': return 'Nhân viên BH';
-      case 'WAREHOUSE': return 'Nhân viên kho';
-      default: return user.role ?? '—';
+      case 'ADMIN':
+        return 'Quản trị viên';
+      case 'MANAGER':
+        return 'Quản lý';
+      case 'STAFF':
+        return 'Nhân viên BH';
+      case 'WAREHOUSE':
+        return 'Nhân viên kho';
+      default:
+        return user.role ?? '—';
     }
   }
 
@@ -488,33 +475,33 @@ class _UserCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive = user.status ?? true;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: !isActive
-            ? const BorderSide(color: Colors.grey, width: 1)
-            : BorderSide.none,
-      ),
+    return HoverCard(child: Card(
+      margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+      shape: !isActive
+          ? RoundedRectangleBorder(
+              borderRadius: AppTheme.roundedMd,
+              side: const BorderSide(color: AppTheme.border),
+            )
+          : null,
       child: Opacity(
-        opacity: isActive ? 1.0 : 0.6,
+        opacity: isActive ? 1.0 : 0.55,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppTheme.spaceMd),
           child: Row(
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: _roleColor.withOpacity(0.15),
+                backgroundColor: _roleColor.withValues(alpha: 0.12),
                 child: Text(
                   (user.fullName ?? user.username)[0].toUpperCase(),
                   style: TextStyle(
                     color: _roleColor,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                     fontSize: 18,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppTheme.spaceMd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,43 +510,35 @@ class _UserCard extends StatelessWidget {
                       children: [
                         Text(
                           user.fullName ?? user.username,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
+                          style: AppTheme.titleSmall,
                         ),
                         if (!isActive) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: AppTheme.spaceSm),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.grey.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
+                              color: AppTheme.surfaceVariant,
+                              borderRadius: AppTheme.roundedXs,
                             ),
-                            child: const Text(
+                            child: Text(
                               'Vô hiệu',
-                              style: TextStyle(
-                                  fontSize: 10, color: Colors.grey),
+                              style: AppTheme.labelSmall,
                             ),
                           ),
                         ],
                       ],
                     ),
-                    Text(
-                      '@${user.username}',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppTheme.textGrey),
-                    ),
-                    const SizedBox(height: 4),
+                    Text('@${user.username}', style: AppTheme.bodySmall),
+                    const SizedBox(height: AppTheme.spaceXs),
                     Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _roleColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
+                            color: _roleColor.withValues(alpha: 0.1),
+                            borderRadius: AppTheme.roundedXs,
                           ),
                           child: Text(
                             _roleLabel,
@@ -570,12 +549,8 @@ class _UserCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          branchName,
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.textGrey),
-                        ),
+                        const SizedBox(width: AppTheme.spaceSm),
+                        Text(branchName, style: AppTheme.labelSmall),
                       ],
                     ),
                   ],
@@ -586,7 +561,7 @@ class _UserCard extends StatelessWidget {
                   const PopupMenuItem(
                     value: 'edit',
                     child: Row(children: [
-                      Icon(Icons.edit, size: 18),
+                      Icon(Icons.edit_outlined, size: 18),
                       SizedBox(width: 8),
                       Text('Sửa'),
                     ]),
@@ -595,15 +570,17 @@ class _UserCard extends StatelessWidget {
                     value: 'toggle',
                     child: Row(children: [
                       Icon(
-                        isActive ? Icons.block : Icons.check_circle,
+                        isActive
+                            ? Icons.block_rounded
+                            : Icons.check_circle_rounded,
                         size: 18,
-                        color: isActive ? Colors.red : Colors.green,
+                        color: isActive ? AppTheme.error : AppTheme.success,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         isActive ? 'Vô hiệu hóa' : 'Kích hoạt',
                         style: TextStyle(
-                          color: isActive ? Colors.red : Colors.green,
+                          color: isActive ? AppTheme.error : AppTheme.success,
                         ),
                       ),
                     ]),
@@ -618,58 +595,60 @@ class _UserCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
-// BỌC GESTURE DETECTOR VÀ THAY ĐỔI GIAO DIỆN KHI ĐƯỢC CHỌN
-class _StatChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _StatChip({
+// ─────────────────────────────────────────
+// CHIP LỌC VAI TRÒ
+// ─────────────────────────────────────────
+class _RoleChip extends StatelessWidget {
+  const _RoleChip({
     required this.label,
-    required this.value,
+    required this.count,
     required this.color,
     required this.isSelected,
     required this.onTap,
   });
+
+  final String label;
+  final int count;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          // Nổi bật toàn khối (màu solid) nếu đang được chọn, nếu không thì nền mờ nhạt
-          color: isSelected ? color : color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? color : color.withValues(alpha: 0.1),
+          borderRadius: AppTheme.roundedFull,
           border: isSelected
               ? null
-              : Border.all(color: color.withOpacity(0.3)),
+              : Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: RichText(
           text: TextSpan(
             children: [
               TextSpan(
-                text: '$value ',
+                text: '$count ',
                 style: TextStyle(
                   color: isSelected ? Colors.white : color,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
               ),
               TextSpan(
                 text: label,
                 style: TextStyle(
-                    color: isSelected ? Colors.white : color,
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal
+                  color: isSelected ? Colors.white : color,
+                  fontSize: 12,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ],

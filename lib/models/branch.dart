@@ -17,4 +17,10 @@ class Branch {
     address: json['address'],
     phone: json['phone'],
   );
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    if (address != null && address!.isNotEmpty) 'address': address,
+    if (phone != null && phone!.isNotEmpty) 'phone': phone,
+  };
 }

@@ -162,6 +162,35 @@ class AppTheme {
     ),
   ];
 
+  /// Shadow mặc định cho card — hiển thị thường trực
+  static List<BoxShadow> get shadowCard => [
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: 0.07),
+      blurRadius: 12,
+      offset: const Offset(0, 3),
+    ),
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: 0.04),
+      blurRadius: 4,
+      offset: const Offset(0, 1),
+    ),
+  ];
+
+  /// Shadow nâng cao khi hover — xanh nhạt + tối sâu hơn
+  static List<BoxShadow> get shadowHover => [
+    BoxShadow(
+      color: const Color(0xFF2E7D32).withValues(alpha: 0.18),
+      blurRadius: 28,
+      offset: const Offset(0, 10),
+      spreadRadius: 2,
+    ),
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: 0.12),
+      blurRadius: 14,
+      offset: const Offset(0, 5),
+    ),
+  ];
+
   // ───────────────────────────── THEME DATA ────────────────────────────────
 
   static ThemeData get lightTheme => ThemeData(
@@ -205,8 +234,9 @@ class AppTheme {
 
     // ── Card ────────────────────────────────────────────────────────────────
     // elevation: 0 + border = gọn gàng hơn elevation + shadow (M3 style)
-    cardTheme: CardTheme(
-      elevation: 0,
+    cardTheme: CardThemeData(
+      elevation: 2,
+      shadowColor: const Color(0x14000000),
       color: surface,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
@@ -340,7 +370,7 @@ class AppTheme {
     ),
 
     // ── Dialog ──────────────────────────────────────────────────────────────
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
       elevation: 3,
@@ -428,7 +458,7 @@ class AppTheme {
     ),
 
     // ── TabBar ───────────────────────────────────────────────────────────────
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       indicatorColor: white,
       labelColor: white,
       unselectedLabelColor: Color(0xB3FFFFFF), // white 70%

@@ -47,14 +47,29 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Nền ảnh
+          // Gradient nền cố định — luôn hiển thị dù không có mạng
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1B4332), // xanh rừng đậm
+                  Color(0xFF2D6A4F), // xanh lá vừa
+                  Color(0xFF1A2E1B), // xanh tối
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+          // Ảnh overlay từ mạng — ẩn khi lỗi, gradient đã đủ fallback
           Image.network(
             'https://images.unsplash.com/photo-1501004318641-b39e6451bec6'
             '?q=80&w=2000&auto=format&fit=crop',
             fit: BoxFit.cover,
-            color: Colors.black.withValues(alpha: 0.45),
+            color: Colors.black.withValues(alpha: 0.40),
             colorBlendMode: BlendMode.darken,
-            errorBuilder: (_, __, ___) => Container(color: AppTheme.primaryDark),
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
 
           // Form đăng nhập
@@ -68,29 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Logo
-                  const Icon(Icons.eco_rounded, color: Colors.white, size: 52),
-                  const SizedBox(height: AppTheme.spaceSm),
-                  const Text(
-                    'MiniFruit',
-                    style: TextStyle(
-                      fontSize: 40,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 1.5,
-                      shadows: [
-                        Shadow(color: Colors.black38, blurRadius: 12, offset: Offset(0, 4)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Hệ thống quản lý cửa hàng',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 13,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
+                  const _MiniFruitLogo(),
                   const SizedBox(height: AppTheme.spaceXxl),
 
                   // Card kính mờ
@@ -212,6 +205,61 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Logo MiniFruit — gradient circle + icon + text
+class _MiniFruitLogo extends StatelessWidget {
+  const _MiniFruitLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF52B788), Color(0xFF1B4332)],
+            ),
+            borderRadius: AppTheme.roundedXl,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2D6A4F).withValues(alpha: 0.55),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.eco_rounded, color: Colors.white, size: 48),
+        ),
+        const SizedBox(height: AppTheme.spaceMd),
+        const Text(
+          'MiniFruit',
+          style: TextStyle(
+            fontSize: 38,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: 1.2,
+            shadows: [
+              Shadow(color: Colors.black38, blurRadius: 16, offset: Offset(0, 4)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Hệ thống quản lý cửa hàng',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.72),
+            fontSize: 13,
+            letterSpacing: 0.4,
+          ),
+        ),
+      ],
     );
   }
 }

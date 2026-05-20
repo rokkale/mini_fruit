@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#52B788"/>
+      <stop offset="100%" stop-color="#1B4332"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Nền bo tròn -->
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+
+  <!-- Lá trái (nghiêng trái) -->
+  <ellipse cx="220" cy="230" rx="90" ry="48"
+    fill="white" fill-opacity="0.9"
+    transform="rotate(-35 220 230)"/>
+
+  <!-- Lá phải (nghiêng phải) -->
+  <ellipse cx="292" cy="230" rx="90" ry="48"
+    fill="white" fill-opacity="0.75"
+    transform="rotate(35 292 230)"/>
+
+  <!-- Thân cây / cuống -->
+  <rect x="248" y="260" width="16" height="90" rx="8"
+    fill="white" fill-opacity="0.9"/>
+
+  <!-- Chấm nổi bật giữa 2 lá -->
+  <circle cx="256" cy="200" r="18" fill="white" fill-opacity="0.95"/>
+</svg>

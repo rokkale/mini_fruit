@@ -56,7 +56,7 @@ class _ShiftHistoryScreenState extends State<ShiftHistoryScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = AppErrorHandler.friendly(e);
           _isLoading = false;
         });
       }

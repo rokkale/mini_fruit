@@ -142,7 +142,7 @@ class _SaleScreenState extends State<_SaleScreen> {
           ),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const AppSkeletonList()
                 : _filtered.isEmpty
                     ? const AppEmptyState(
                         icon: Icons.search_off_rounded,
@@ -789,7 +789,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppSkeletonList()
           : _error != null
               ? AppErrorState(message: _error!, onRetry: _loadOrders)
               : _orders.isEmpty

@@ -106,24 +106,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppSkeletonList();
     }
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 8),
-            Text(_error!),
-            const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadProducts, child: const Text('Thử lại')),
-          ],
-        ),
-      );
+      return AppErrorState(message: _error!, onRetry: _loadProducts);
     }
     if (_filtered.isEmpty) {
-      return const Center(child: Text('Không có sản phẩm nào'));
+      return const AppEmptyState(
+        icon: Icons.inventory_2_outlined,
+        message: 'Không có sản phẩm nào',
+      );
     }
 
     return RefreshIndicator(

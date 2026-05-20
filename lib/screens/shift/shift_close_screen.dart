@@ -90,7 +90,7 @@ class _ShiftCloseScreenState extends State<ShiftCloseScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = AppErrorHandler.friendly(e);
           _isLoading = false;
         });
       }

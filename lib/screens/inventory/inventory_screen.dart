@@ -57,10 +57,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     });
     try {
       final auth = context.read<AuthProvider>();
-      // readOnly (Staff): dùng shiftBranchId; fallback auth.branchId
-      final branchId = _readOnly
-          ? (widget.shiftBranchId ?? auth.branchId)
-          : auth.branchId;
+      final branchId = widget.shiftBranchId ?? auth.branchId;
 
       if (_readOnly) {
         _stocks = branchId != null
@@ -133,7 +130,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               label: const Text('Tạo phiếu'),
             ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppSkeletonList()
           : _error != null
               ? AppErrorState(message: _error!, onRetry: _loadData)
               : _readOnly

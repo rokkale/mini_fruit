@@ -37,8 +37,8 @@ class AppTheme {
   static const Color textDisabled = Color(0xFFB0B7AF); // placeholder
 
   // Semantic
-  static const Color success          = Color(0xFF2E7D32);
-  static const Color successContainer = Color(0xFFB7F0B1);
+  static const Color success          = Color(0xFF00897B); // teal — phân biệt với primary
+  static const Color successContainer = Color(0xFFB2DFDB);
   static const Color error            = Color(0xFFBA1A1A);
   static const Color errorContainer   = Color(0xFFFFDAD6);
   static const Color warning          = Color(0xFFF57C00);

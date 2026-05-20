@@ -27,24 +27,36 @@ class HoverCard extends StatefulWidget {
 
 class _HoverCardState extends State<HoverCard> {
   bool _hovered = false;
+  bool _pressed = false;
+
+  double get _scale {
+    if (_hovered) return widget.scaleOnHover;
+    if (_pressed) return 0.97;
+    return 1.0;
+  }
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedScale(
-        scale: _hovered ? widget.scaleOnHover : 1.0,
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOut,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _scale,
+          duration: const Duration(milliseconds: 140),
           curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            borderRadius: widget.borderRadius,
-            boxShadow: _hovered ? AppTheme.shadowHover : AppTheme.shadowCard,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOut,
+            decoration: BoxDecoration(
+              borderRadius: widget.borderRadius,
+              boxShadow: _hovered ? AppTheme.shadowHover : AppTheme.shadowCard,
+            ),
+            child: widget.child,
           ),
-          child: widget.child,
         ),
       ),
     );
@@ -115,6 +127,149 @@ class AppEmptyState extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Skeleton list với shimmer — thay thế CircularProgressIndicator khi tải dữ liệu.
+///
+/// Dùng:
+///   AppSkeletonList()
+///   AppSkeletonList(itemCount: 8, hasLeading: false)
+class AppSkeletonList extends StatefulWidget {
+  const AppSkeletonList({
+    super.key,
+    this.itemCount = 6,
+    this.hasLeading = true,
+  });
+
+  final int itemCount;
+  final bool hasLeading;
+
+  @override
+  State<AppSkeletonList> createState() => _AppSkeletonListState();
+}
+
+class _AppSkeletonListState extends State<AppSkeletonList>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1300),
+      vsync: this,
+    )..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) {
+        final gradient = LinearGradient(
+          begin: Alignment(_anim.value - 1, 0),
+          end: Alignment(_anim.value + 1, 0),
+          colors: const [
+            Color(0xFFECECEC),
+            Color(0xFFF8F8F8),
+            Color(0xFFECECEC),
+          ],
+        );
+        return ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(AppTheme.spaceMd),
+          itemCount: widget.itemCount,
+          itemBuilder: (_, __) => _SkeletonItem(
+            gradient: gradient,
+            hasLeading: widget.hasLeading,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SkeletonItem extends StatelessWidget {
+  const _SkeletonItem({required this.gradient, required this.hasLeading});
+
+  final Gradient gradient;
+  final bool hasLeading;
+
+  Widget _box({double? width, required double height, double radius = 6}) =>
+      Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppTheme.spaceSm),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spaceMd),
+        child: Row(
+          children: [
+            if (hasLeading) ...[
+              _box(width: 48, height: 48, radius: AppTheme.radiusSm),
+              const SizedBox(width: AppTheme.spaceMd),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _box(height: 14),
+                  const SizedBox(height: 6),
+                  _box(width: 140, height: 11),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppTheme.spaceMd),
+            _box(width: 48, height: 24, radius: AppTheme.radiusSm),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Chuyển exception thành thông báo lỗi thân thiện.
+///
+///   description: AppErrorHandler.friendly(e)
+class AppErrorHandler {
+  AppErrorHandler._();
+
+  static String friendly(dynamic error) {
+    final s = error.toString();
+    if (s.contains('SocketException') || s.contains('Failed host lookup')) {
+      return 'Không có kết nối mạng';
+    }
+    if (s.contains('401') || s.contains('Unauthorized')) {
+      return 'Phiên đăng nhập hết hạn';
+    }
+    if (s.contains('403') || s.contains('Forbidden')) {
+      return 'Không có quyền truy cập';
+    }
+    if (s.contains('404')) return 'Không tìm thấy dữ liệu';
+    if (s.contains('500') || s.contains('502') || s.contains('503')) {
+      return 'Lỗi máy chủ, thử lại sau';
+    }
+    if (s.contains('TimeoutException')) return 'Hết thời gian kết nối';
+    return 'Đã xảy ra lỗi, thử lại sau';
   }
 }
 

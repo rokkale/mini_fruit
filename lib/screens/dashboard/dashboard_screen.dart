@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -36,7 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
 
   List<Product> _products = [];
-  List<Product> _filteredProducts = [];
+  final _filteredProducts = ValueNotifier<List<Product>>([]);
   List<Category> _categories = [];
   int? _selectedCategory;
 
@@ -48,6 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  Timer? _searchDebounce;
 
   final TextEditingController _discountController = TextEditingController();
   bool _isDiscountPercent = false;
@@ -97,6 +100,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _filteredProducts.dispose();
     _searchController.dispose();
     _discountController.dispose();
     _startingCashController.dispose();
@@ -123,7 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() {
           _products = products;
-          _filteredProducts = products;
+          _filteredProducts.value = products;
           _categories = categories;
           _branches = branches;
 
@@ -140,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Lỗi khi tải dữ liệu: $e';
+          _errorMessage = AppErrorHandler.friendly(e);
           _isLoading = false;
         });
       }
@@ -346,16 +351,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _filterProducts() {
     final keyword = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredProducts = _products.where((p) {
-        final categoryMatch =
-            _selectedCategory == null || p.categoryId == _selectedCategory;
-        final keywordMatch = p.productName.toLowerCase().contains(keyword) ||
-            (p.sku?.toLowerCase().contains(keyword) ?? false) ||
-            (p.barcode?.toLowerCase().contains(keyword) ?? false);
-        return categoryMatch && keywordMatch;
-      }).toList();
-    });
+    _filteredProducts.value = _products.where((p) {
+      final categoryMatch =
+          _selectedCategory == null || p.categoryId == _selectedCategory;
+      final keywordMatch = p.productName.toLowerCase().contains(keyword) ||
+          (p.sku?.toLowerCase().contains(keyword) ?? false) ||
+          (p.barcode?.toLowerCase().contains(keyword) ?? false);
+      return categoryMatch && keywordMatch;
+    }).toList();
   }
 
   void _addProductToCart(Product product) {
@@ -806,7 +809,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: TextField(
                   controller: _searchController,
                   autofocus: true,
-                  onChanged: (_) => _filterProducts(),
+                  onChanged: (_) {
+                    _searchDebounce?.cancel();
+                    _searchDebounce = Timer(
+                      const Duration(milliseconds: 300),
+                      _filterProducts,
+                    );
+                  },
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Tìm tên, mã vạch...',
@@ -915,20 +924,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Expanded(
                   flex: 2,
-                  child: _buildMainContent(_filteredProducts, crossAxisCount: 4),
-                ),
-                Container(
-                  width: 380,
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    boxShadow: AppTheme.shadowMd,
+                  child: RepaintBoundary(
+                    child: ValueListenableBuilder<List<Product>>(
+                      valueListenable: _filteredProducts,
+                      builder: (_, products, __) =>
+                          _buildMainContent(products, crossAxisCount: 4),
+                    ),
                   ),
-                  child: _buildCartContent(cart),
+                ),
+                RepaintBoundary(
+                  child: Container(
+                    width: 380,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      boxShadow: AppTheme.shadowMd,
+                    ),
+                    child: _buildCartContent(cart),
+                  ),
                 ),
               ],
             );
           }
-          return _buildMainContent(_filteredProducts, crossAxisCount: 3);
+          return RepaintBoundary(
+            child: ValueListenableBuilder<List<Product>>(
+              valueListenable: _filteredProducts,
+              builder: (_, products, __) =>
+                  _buildMainContent(products, crossAxisCount: 3),
+            ),
+          );
         },
       ),
     );
@@ -936,7 +959,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildMainContent(List<Product> products, {required int crossAxisCount}) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppSkeletonList(hasLeading: false);
     }
     if (_errorMessage != null) {
       return AppErrorState(
@@ -1027,115 +1050,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildProductCard(Product product) {
-    final cartActions = context.read<CartProvider>();
-
-    void addToCart() {
-      if (!_isShiftOpen) {
-        _checkAndShowOpenShift();
-        return;
-      }
-      cartActions.addProduct(product);
-      _applyDiscount(cartActions);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã thêm ${product.productName}'),
-          duration: const Duration(seconds: 1),
-        ),
+  Widget _buildProductCard(Product product) => _ProductCard(
+        key: ValueKey(product.productId),
+        product: product,
+        onAdd: () => _addProductToCart(product),
+        currencyFormat: _currencyFormat,
       );
-    }
-
-    return HoverCard(child: Card(
-      child: InkWell(
-        borderRadius: AppTheme.roundedMd,
-        onTap: addToCart,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Ảnh sản phẩm
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.07),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppTheme.radiusMd),
-                  ),
-                ),
-                child: product.imageUrl != null && product.imageUrl!.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(AppTheme.radiusMd),
-                        ),
-                        child: Image.network(
-                          product.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.image_not_supported_outlined,
-                            color: AppTheme.textDisabled,
-                          ),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.eco_outlined,
-                        size: 40,
-                        color: AppTheme.textDisabled,
-                      ),
-              ),
-            ),
-
-            // Tên & giá
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppTheme.spaceSm,
-                AppTheme.spaceSm,
-                AppTheme.spaceSm,
-                AppTheme.spaceXs,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.productName,
-                    style: AppTheme.titleSmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _currencyFormat.format(product.sellingPrice),
-                    style: AppTheme.priceStyle,
-                  ),
-                ],
-              ),
-            ),
-
-            // Nút thêm
-            Container(
-              width: double.infinity,
-              height: 34,
-              decoration: const BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(AppTheme.radiusMd),
-                ),
-              ),
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Thêm', style: TextStyle(fontSize: 12)),
-                onPressed: addToCart,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ));
-  }
 
   Widget _buildCartContent(CartProvider cart, {StateSetter? setModalState}) {
     return Column(
@@ -1488,10 +1408,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ? const Icon(Icons.check_rounded, color: AppTheme.primary)
                       : null,
                   onTap: () {
-                    setState(() {
-                      _selectedCategory = cat?.id;
-                      _filterProducts();
-                    });
+                    _selectedCategory = cat?.id;
+                    _filterProducts();
                     Navigator.pop(context);
                   },
                 );
@@ -1726,7 +1644,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         iconColor: const Color(0xFF6A1B9A),
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const InventoryScreen()),
+          MaterialPageRoute(builder: (_) => InventoryScreen(shiftBranchId: _selectedBranch?.id)),
         ),
       ));
     }
@@ -1893,6 +1811,116 @@ class _QtyButton extends StatelessWidget {
           vertical: AppTheme.spaceXs,
         ),
         child: Icon(icon, size: 18, color: AppTheme.textMedium),
+      ),
+    );
+  }
+}
+
+// ── Product Card ─────────────────────────────────────────────────────────────
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({
+    super.key,
+    required this.product,
+    required this.onAdd,
+    required this.currencyFormat,
+  });
+
+  final Product product;
+  final VoidCallback onAdd;
+  final NumberFormat currencyFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    return HoverCard(
+      child: Card(
+        child: InkWell(
+          borderRadius: AppTheme.roundedMd,
+          onTap: onAdd,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Ảnh sản phẩm
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.07),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(AppTheme.radiusMd),
+                    ),
+                  ),
+                  child: product.imageUrl != null && product.imageUrl!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(AppTheme.radiusMd),
+                          ),
+                          child: Image.network(
+                            product.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.image_not_supported_outlined,
+                              color: AppTheme.textDisabled,
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.eco_outlined,
+                          size: 40,
+                          color: AppTheme.textDisabled,
+                        ),
+                ),
+              ),
+
+              // Tên & giá
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.spaceSm,
+                  AppTheme.spaceSm,
+                  AppTheme.spaceSm,
+                  AppTheme.spaceXs,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.productName,
+                      style: AppTheme.titleSmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      currencyFormat.format(product.sellingPrice),
+                      style: AppTheme.priceStyle,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Nút thêm
+              Container(
+                width: double.infinity,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(AppTheme.radiusMd),
+                  ),
+                ),
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Thêm', style: TextStyle(fontSize: 12)),
+                  onPressed: onAdd,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

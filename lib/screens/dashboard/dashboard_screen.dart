@@ -715,6 +715,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
                     ),
+                    // QR chuyển khoản trong dialog xác nhận
+                    if (cart.paymentMethod == 'TRANSFER') ...[
+                      const SizedBox(height: AppTheme.spaceSm),
+                      _VietQrCard(amount: cart.freeAmount, compact: false),
+                    ],
                     const Divider(height: AppTheme.spaceMd),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1237,43 +1242,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
 
-                  // QR chuyển khoản
+                  // QR chuyển khoản (thật — VietQR)
                   if (cart.paymentMethod == 'TRANSFER') ...[
                     const SizedBox(height: AppTheme.spaceSm),
-                    Container(
-                      padding: const EdgeInsets.all(AppTheme.spaceSm),
-                      decoration: BoxDecoration(
-                        color: AppTheme.infoContainer,
-                        borderRadius: AppTheme.roundedSm,
-                        border: Border.all(
-                          color: AppTheme.info.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.qr_code_2_rounded,
-                              size: 56, color: AppTheme.info),
-                          const SizedBox(width: AppTheme.spaceSm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Mã QR thanh toán',
-                                  style: AppTheme.titleSmall
-                                      .copyWith(color: AppTheme.info),
-                                ),
-                                Text(
-                                  'Quét mã để chuyển '
-                                  '${_currencyFormat.format(cart.freeAmount)}',
-                                  style: AppTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _VietQrCard(amount: cart.freeAmount, compact: true),
                   ],
                   const SizedBox(height: AppTheme.spaceSm),
 
@@ -1956,6 +1928,109 @@ class _QrScannerPageState extends State<_QrScannerPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Widget hiển thị QR VietQR thật
+//   compact = true  → dùng trong cart sidebar (ngang, nhỏ gọn)
+//   compact = false → dùng trong dialog xác nhận (dọc, lớn hơn)
+// ─────────────────────────────────────────────────────────────────────────────
+class _VietQrCard extends StatelessWidget {
+  final double amount;
+  final bool compact;
+
+  const _VietQrCard({required this.amount, required this.compact});
+
+  String get _qrUrl {
+    final owner = Uri.encodeComponent(AppConstants.bankOwner);
+    const info = 'Thanh%20toan';
+    return 'https://img.vietqr.io/image/'
+        '${AppConstants.bankBin}-${AppConstants.bankAccount}-compact2.png'
+        '?amount=${amount.toInt()}&addInfo=$info&accountName=$owner';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+    final qrSize = compact ? 72.0 : 160.0;
+
+    final qrImage = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        _qrUrl,
+        width: qrSize,
+        height: qrSize,
+        fit: BoxFit.contain,
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : SizedBox(
+                width: qrSize,
+                height: qrSize,
+                child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+        errorBuilder: (_, __, ___) => SizedBox(
+          width: qrSize,
+          height: qrSize,
+          child: const Center(
+            child: Icon(Icons.qr_code_2_rounded,
+                size: 40, color: AppTheme.textGrey),
+          ),
+        ),
+      ),
+    );
+
+    final bankInfo = Column(
+      crossAxisAlignment:
+          compact ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(AppConstants.bankId,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text(AppConstants.bankAccount,
+            style:
+                const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        Text(AppConstants.bankOwner,
+            style:
+                const TextStyle(fontSize: 12, color: AppTheme.textGrey)),
+        const SizedBox(height: 2),
+        Text(
+          fmt.format(amount),
+          style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: AppTheme.primary),
+        ),
+      ],
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.infoContainer,
+        borderRadius: AppTheme.roundedSm,
+        border: Border.all(color: AppTheme.info.withValues(alpha: 0.3)),
+      ),
+      child: compact
+          ? Row(children: [qrImage, const SizedBox(width: 10), Expanded(child: bankInfo)])
+          : Column(
+              children: [
+                const Text(
+                  'Quét mã QR để thanh toán',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.info),
+                ),
+                const SizedBox(height: 10),
+                qrImage,
+                const SizedBox(height: 8),
+                bankInfo,
+              ],
+            ),
     );
   }
 }

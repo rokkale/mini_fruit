@@ -569,200 +569,239 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-        ),
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(
-            AppTheme.spaceMd, 48, AppTheme.spaceMd, AppTheme.spaceMd,
+      builder: (ctx) {
+        final maxH = MediaQuery.of(ctx).size.height * 0.92;
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
           ),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: AppTheme.roundedLg,
-            boxShadow: AppTheme.shadowLg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.spaceMd,
-                  vertical: AppTheme.spaceSm + 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryContainer,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppTheme.radiusLg),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.receipt_long_rounded, color: AppTheme.primary),
-                    const SizedBox(width: AppTheme.spaceSm),
-                    Text(
-                      'Xác nhận thanh toán',
-                      style: AppTheme.titleMedium.copyWith(color: AppTheme.primary),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${cart.itemCount} sản phẩm',
-                      style: AppTheme.bodySmall.copyWith(color: AppTheme.primary),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Danh sách sản phẩm
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.35,
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(
+              AppTheme.spaceMd, 48, AppTheme.spaceMd, AppTheme.spaceMd,
+            ),
+            constraints: BoxConstraints(maxHeight: maxH),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: AppTheme.roundedLg,
+              boxShadow: AppTheme.shadowLg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── HEADER (cố định) ─────────────────────────────────────
+                Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppTheme.spaceMd,
-                    vertical: AppTheme.spaceSm,
+                    vertical: AppTheme.spaceSm + 4,
                   ),
-                  itemCount: cart.items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final item = cart.items[i];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppTheme.spaceXs + 2,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryContainer,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(AppTheme.radiusLg),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.receipt_long_rounded,
+                          color: AppTheme.primary),
+                      const SizedBox(width: AppTheme.spaceSm),
+                      Text(
+                        'Xác nhận thanh toán',
+                        style: AppTheme.titleMedium
+                            .copyWith(color: AppTheme.primary),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      const Spacer(),
+                      Text(
+                        '${cart.itemCount} sản phẩm',
+                        style: AppTheme.bodySmall
+                            .copyWith(color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── NỘI DUNG CUỘN ────────────────────────────────────────
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppTheme.spaceMd,
+                        vertical: AppTheme.spaceSm),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Danh sách sản phẩm
+                        ...cart.items.map((item) => Column(
                               children: [
-                                Text(
-                                  item.product.productName,
-                                  style: AppTheme.bodyMedium,
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: AppTheme.spaceXs + 2),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(item.product.productName,
+                                                style: AppTheme.bodyMedium),
+                                            Text(
+                                              '${_currencyFormat.format(item.product.sellingPrice)} × ${item.quantity}',
+                                              style: AppTheme.bodySmall
+                                                  .copyWith(
+                                                      color:
+                                                          AppTheme.textGrey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        _currencyFormat
+                                            .format(item.subtotal),
+                                        style: AppTheme.bodyMedium.copyWith(
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                Text(
-                                  '${_currencyFormat.format(item.product.sellingPrice)} × ${item.quantity}',
-                                  style: AppTheme.bodySmall
-                                      .copyWith(color: AppTheme.textGrey),
+                                const Divider(height: 1),
+                              ],
+                            )),
+
+                        const SizedBox(height: AppTheme.spaceSm),
+
+                        // Tóm tắt tiền
+                        Container(
+                          padding: const EdgeInsets.all(AppTheme.spaceSm),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceVariant,
+                            borderRadius: AppTheme.roundedSm,
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Tạm tính:',
+                                      style: AppTheme.bodyMedium),
+                                  Text(
+                                    _currencyFormat.format(cart.totalAmount),
+                                    style: AppTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                              if (cart.discount > 0) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Giảm giá:',
+                                        style: AppTheme.bodyMedium
+                                            .copyWith(color: AppTheme.error)),
+                                    Text(
+                                      '- ${_currencyFormat.format(cart.discount)}',
+                                      style: AppTheme.bodyMedium
+                                          .copyWith(color: AppTheme.error),
+                                    ),
+                                  ],
                                 ),
                               ],
-                            ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Thanh toán bằng:',
+                                      style: AppTheme.bodyMedium),
+                                  Text(
+                                    cart.paymentMethod == 'CASH'
+                                        ? '💵 Tiền mặt'
+                                        : '🏦 Chuyển khoản',
+                                    style: AppTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          Text(
-                            _currencyFormat.format(item.subtotal),
-                            style: AppTheme.bodyMedium
-                                .copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
+                        ),
 
-              // Footer tổng tiền + nút
-              Container(
-                padding: const EdgeInsets.all(AppTheme.spaceMd),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceVariant,
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(AppTheme.radiusLg),
+                        // QR chuyển khoản (cuộn cùng nội dung)
+                        if (cart.paymentMethod == 'TRANSFER') ...[
+                          const SizedBox(height: AppTheme.spaceSm),
+                          _VietQrCard(
+                              amount: cart.freeAmount, compact: false),
+                        ],
+
+                        const Divider(height: AppTheme.spaceMd),
+
+                        // Thành tiền
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Thành tiền:',
+                                style: AppTheme.titleSmall),
+                            Text(
+                              _currencyFormat.format(cart.freeAmount),
+                              style: AppTheme.priceLarge,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppTheme.spaceSm),
+                      ],
+                    ),
                   ),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Tạm tính:', style: AppTheme.bodyMedium),
-                        Text(
-                          _currencyFormat.format(cart.totalAmount),
-                          style: AppTheme.bodyMedium,
-                        ),
-                      ],
+
+                // ── BUTTONS (cố định đáy) ─────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppTheme.spaceMd,
+                    AppTheme.spaceSm,
+                    AppTheme.spaceMd,
+                    AppTheme.spaceMd,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceVariant,
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(AppTheme.radiusLg),
                     ),
-                    if (cart.discount > 0) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Giảm giá:',
-                            style: AppTheme.bodyMedium
-                                .copyWith(color: AppTheme.error),
+                    border: Border(
+                      top: BorderSide(
+                          color: AppTheme.border, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Hủy'),
+                        ),
+                      ),
+                      const SizedBox(width: AppTheme.spaceSm),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _handleCheckout(cart);
+                          },
+                          child: const Text(
+                            'Xác nhận thanh toán',
+                            style:
+                                TextStyle(fontWeight: FontWeight.w700),
                           ),
-                          Text(
-                            '- ${_currencyFormat.format(cart.discount)}',
-                            style: AppTheme.bodyMedium
-                                .copyWith(color: AppTheme.error),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Thanh toán bằng:', style: AppTheme.bodyMedium),
-                        Text(
-                          cart.paymentMethod == 'CASH'
-                              ? '💵 Tiền mặt'
-                              : '🏦 Chuyển khoản',
-                          style: AppTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                    // QR chuyển khoản trong dialog xác nhận
-                    if (cart.paymentMethod == 'TRANSFER') ...[
-                      const SizedBox(height: AppTheme.spaceSm),
-                      _VietQrCard(amount: cart.freeAmount, compact: false),
-                    ],
-                    const Divider(height: AppTheme.spaceMd),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Thành tiền:', style: AppTheme.titleSmall),
-                        Text(
-                          _currencyFormat.format(cart.freeAmount),
-                          style: AppTheme.priceLarge,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppTheme.spaceMd),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Hủy'),
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.spaceSm),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _handleCheckout(cart);
-                            },
-                            child: const Text(
-                              'Xác nhận thanh toán',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

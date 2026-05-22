@@ -13,6 +13,7 @@ import '../../providers/cart_provider.dart';
 import '../products/products_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../orders/orders_screen.dart';
+import '../../widgets/receipt_dialog.dart';
 import '../users/users_screen.dart';
 import '../branches/branches_screen.dart';
 import '../../models/product.dart';
@@ -444,11 +445,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) return;
 
     if (success) {
+      // Lấy lastOrder TRƯỚC khi pop/clear để không mất reference
+      final order = cart.lastOrder;
       if (MediaQuery.of(context).size.width < 800 && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
       _discountController.clear();
-      _showSuccessDialog();
+      // Hiển thị bill hóa đơn
+      if (order != null && mounted) {
+        ReceiptDialog.show(context, order);
+      }
     } else {
       final errorMsg = cart.errorMessage ?? 'Thanh toán thất bại';
       final isStockError = _isStockError(errorMsg);
@@ -755,41 +761,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppTheme.successContainer,
-                borderRadius: AppTheme.roundedFull,
-              ),
-              child: const Icon(Icons.check_rounded, color: AppTheme.success, size: 40),
-            ),
-            const SizedBox(height: AppTheme.spaceMd),
-            Text('Thanh toán thành công!', style: AppTheme.titleMedium),
-            const SizedBox(height: AppTheme.spaceXs),
-            Text('Đơn hàng đã được lưu', style: AppTheme.bodySmall),
-          ],
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Đóng'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // _showSuccessDialog đã được thay bằng ReceiptDialog.show() — xem _handleCheckout
 
   @override
   Widget build(BuildContext context) {

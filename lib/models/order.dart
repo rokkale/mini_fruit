@@ -15,14 +15,24 @@ class OrderDetail {
     required this.unitPrice,
   });
 
-  factory OrderDetail.fromJson(Map<String, dynamic> json) => OrderDetail(
-    orderDetailId: json['orderDetailId'] ?? json['order_detail_id'],
-    orderId: json['orderId'] ?? json['order_id'],
-    productId: json['productId'] ?? json['product_id'],
-    productName: json['productName'],
-    quantity: json['quantity'],
-    unitPrice: (json['unitPrice'] ?? json['unit_price'] as num).toDouble(),
-  );
+  factory OrderDetail.fromJson(Map<String, dynamic> json) {
+    // product có thể nằm trong nested object
+    final product = json['product'] as Map<String, dynamic>?;
+    return OrderDetail(
+      orderDetailId: json['orderDetailId'] ?? json['order_detail_id'],
+      orderId:       json['orderId']       ?? json['order_id'],
+      productId:     product?['productId'] ?? json['productId'] ?? json['product_id'] ?? 0,
+      productName:   product?['productName'] ?? product?['name']
+                     ?? json['productName']   ?? json['product_name'],
+      quantity:      json['quantity'] ?? 1,
+      unitPrice:     ((json['unitPrice']
+                     ?? json['unit_price']
+                     ?? json['price']
+                     ?? product?['sellingPrice']
+                     ?? product?['price']
+                     ?? 0) as num).toDouble(),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'productId': productId,
@@ -78,9 +88,7 @@ class Order {
       freeAmount:   json['freeAmount'] != null ? (json['freeAmount'] as num).toDouble() : null,
       paymentMethod: json['paymentMethod'] ?? json['payment_method'],
       createdAt:    json['createdAt'] ?? json['created_at'],
-      details:      json['details'] != null
-          ? (json['details'] as List).map((e) => OrderDetail.fromJson(e)).toList()
-          : null,
+      details:      _parseDetails(json),
     );
   }
 
@@ -92,4 +100,16 @@ class Order {
     'discount': discount ?? 0,
     'items': details?.map((e) => e.toJson()).toList(),
   };
+}
+
+/// Thử nhiều key khác nhau mà backend có thể dùng cho danh sách sản phẩm.
+/// Spring Boot JPA thường trả: details / orderDetails / items / order_details
+List<OrderDetail>? _parseDetails(Map<String, dynamic> json) {
+  for (final key in ['details', 'orderDetails', 'order_details', 'items', 'products']) {
+    final raw = json[key];
+    if (raw != null && raw is List && raw.isNotEmpty) {
+      return raw.map((e) => OrderDetail.fromJson(e as Map<String, dynamic>)).toList();
+    }
+  }
+  return null;
 }

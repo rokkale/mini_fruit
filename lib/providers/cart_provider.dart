@@ -148,6 +148,17 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Lưu details từ giỏ hàng trước khi gọi API
+      // (backend thường không trả về details trong response createOrder)
+      final localDetails = _items
+          .map((item) => OrderDetail(
+                productId: item.product.productId!,
+                productName: item.product.productName,
+                quantity: item.quantity,
+                unitPrice: item.product.sellingPrice,
+              ))
+          .toList();
+
       final order = Order(
         branchId: branchId,
         userId: userId,
@@ -156,25 +167,36 @@ class CartProvider extends ChangeNotifier {
         discount: _discount,
         freeAmount: freeAmount,
         paymentMethod: _paymentMethod,
-        details: _items
-            .map((item) => OrderDetail(
-          productId: item.product.productId!,
-          productName: item.product.productName,
-          quantity: item.quantity,
-          unitPrice: item.product.sellingPrice,
-        ))
-            .toList(),
+        details: localDetails,
       );
 
-      _lastOrder = await _orderService.createOrder(order);
+      var apiOrder = await _orderService.createOrder(order);
+
+      // Nếu API không trả về details → gắn lại từ giỏ hàng local
+      if (apiOrder.details == null || apiOrder.details!.isEmpty) {
+        apiOrder = Order(
+          orderId:      apiOrder.orderId,
+          branchId:     apiOrder.branchId,
+          branchName:   apiOrder.branchName,
+          userId:       apiOrder.userId,
+          customerId:   apiOrder.customerId,
+          customerName: apiOrder.customerName,
+          totalAmount:  apiOrder.totalAmount,
+          discount:     apiOrder.discount,
+          freeAmount:   apiOrder.freeAmount,
+          paymentMethod: apiOrder.paymentMethod,
+          createdAt:    apiOrder.createdAt,
+          details:      localDetails, // dùng dữ liệu local
+        );
+      }
+
+      _lastOrder = apiOrder;
       _isLoading = false;
-      // Lưu lại order trước khi xóa giỏ hàng
-      final savedOrder = _lastOrder;
+      // Xóa giỏ hàng nhưng giữ lastOrder để màn hình bill đọc được
       _items = [];
       _discount = 0;
       _customerId = null;
       _paymentMethod = 'CASH';
-      _lastOrder = savedOrder; // khôi phục để dialog có thể đọc
       notifyListeners();
       return true;
     } catch (e) {

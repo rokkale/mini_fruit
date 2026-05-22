@@ -7,20 +7,21 @@ import '../core/theme.dart';
 import '../models/order.dart';
 import '../services/receipt_service.dart';
 
-/// Hiển thị hóa đơn sau khi thanh toán thành công.
+/// Hiển thị hóa đơn sau khi thanh toán thành công, hoặc xem lại lịch sử.
 /// Dùng chung cho dashboard_screen và orders_screen.
-/// Nút "In hóa đơn" gọi ReceiptService — sẵn sàng kết nối máy in vật lý sau.
+/// [showQr] = false → ẩn mã QR (dùng khi xem lại lịch sử, đơn đã thanh toán).
 class ReceiptDialog extends StatelessWidget {
   final Order order;
+  final bool showQr;
 
-  const ReceiptDialog({super.key, required this.order});
+  const ReceiptDialog({super.key, required this.order, this.showQr = true});
 
   /// Mở dialog từ bất kỳ context nào
-  static void show(BuildContext context, Order order) {
+  static void show(BuildContext context, Order order, {bool showQr = true}) {
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (_) => ReceiptDialog(order: order),
+      builder: (_) => ReceiptDialog(order: order, showQr: showQr),
     );
   }
 
@@ -165,8 +166,8 @@ class ReceiptDialog extends StatelessWidget {
                       isTransfer ? '💳  Chuyển khoản' : '💵  Tiền mặt',
                     ),
 
-                    // ── QR chuyển khoản ───────────────────────────────────
-                    if (isTransfer) ...[
+                    // ── QR chuyển khoản (ẩn khi xem lịch sử) ────────────
+                    if (isTransfer && showQr) ...[
                       const Divider(height: 24),
                       const Center(
                         child: Text(

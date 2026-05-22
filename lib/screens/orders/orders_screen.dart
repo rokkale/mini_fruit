@@ -787,33 +787,45 @@ class _HistoryScreenState extends State<_HistoryScreen> {
     );
   }
 
-  void _showOrderDetail(BuildContext context, Order order) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(AppTheme.spaceMd),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Đơn hàng #${order.orderId}', style: AppTheme.titleMedium),
-            const Divider(),
-            _DetailRow('Chi nhánh:', order.branchName ?? '—'),
-            _DetailRow('Khách hàng:', order.customerName ?? 'Khách lẻ'),
-            _DetailRow('Thanh toán:', order.paymentMethod ?? '—'),
-            _DetailRow(
-                'Giảm giá:', _currencyFormat.format(order.discount ?? 0)),
-            _DetailRow(
-              'Thành tiền:',
-              _currencyFormat.format(order.freeAmount ?? order.totalAmount),
-              valueStyle: AppTheme.priceLarge,
+  Future<void> _showOrderDetail(BuildContext context, Order order) async {
+    // Nếu chưa có danh sách sản phẩm → fetch từ API
+    Order fullOrder = order;
+    if (order.details == null || order.details!.isEmpty) {
+      // Hiện loading trong khi fetch
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 12),
+                  Text('Đang tải chi tiết...'),
+                ],
+              ),
             ),
-            if (order.createdAt != null)
-              _DetailRow('Thời gian:', order.createdAt!),
-          ],
+          ),
         ),
-      ),
-    );
+      );
+
+      try {
+        fullOrder = await _orderService.getOrderById(order.orderId!);
+      } catch (_) {
+        fullOrder = order; // fallback nếu API lỗi
+      }
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // đóng loading
+    }
+
+    if (!context.mounted) return;
+    // Hiện bill, ẩn QR (đơn đã thanh toán xong rồi)
+    ReceiptDialog.show(context, fullOrder, showQr: false);
   }
 }
 
@@ -879,24 +891,3 @@ class _OrderCard extends StatelessWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final TextStyle? valueStyle;
-
-  const _DetailRow(this.label, this.value, {this.valueStyle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spaceXs),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: AppTheme.bodyMedium.copyWith(color: AppTheme.textGrey)),
-          Text(value, style: valueStyle ?? AppTheme.bodyMedium),
-        ],
-      ),
-    );
-  }
-}

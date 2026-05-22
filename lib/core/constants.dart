@@ -24,4 +24,12 @@ class AppConstants {
   static const String shiftStartingCashKey = 'shift_starting_cash';
   static const String shiftStartTimeKey = 'shift_start_time';
   static const String shiftBranchIdKey = 'shift_branch_id';
+
+  // Thông tin cửa hàng & tài khoản ngân hàng (chuyển khoản)
+  static const String storeName    = 'Mini Fruit';
+  static const String storeAddress = ''; // Địa chỉ cửa hàng (tuỳ chỉnh)
+  static const String bankId       = 'MB';       // Tên ngân hàng hiển thị
+  static const String bankBin      = '970422';   // BIN MB Bank – tra tại img.vietqr.io/image/list
+  static const String bankAccount  = '0123456789'; // ← Thay bằng STK thật
+  static const String bankOwner    = 'MINI FRUIT'; // ← Thay bằng tên chủ TK thật
 }

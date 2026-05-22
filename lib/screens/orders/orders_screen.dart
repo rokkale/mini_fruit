@@ -10,6 +10,7 @@ import '../../providers/cart_provider.dart';
 import '../../services/order_service.dart';
 import '../../services/product_service.dart';
 import '../../services/branch_service.dart';
+import '../../services/receipt_service.dart';
 
 class OrdersScreen extends StatefulWidget {
   final bool isSale;
@@ -423,6 +424,9 @@ class _CartBottomSheetState extends State<_CartBottomSheet> {
   }
 
   void _showSuccessDialog() {
+    // Đọc lastOrder trước khi build dialog (cart đã bị clear nhưng lastOrder được giữ)
+    final order = context.read<CartProvider>().lastOrder;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -447,6 +451,25 @@ class _CartBottomSheetState extends State<_CartBottomSheet> {
           ],
         ),
         actions: [
+          // Nút in hóa đơn
+          if (order != null)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.print_rounded),
+                label: const Text('In hóa đơn'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: const BorderSide(color: AppTheme.primary),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ReceiptService().printReceipt(order);
+                },
+              ),
+            ),
+          const SizedBox(height: 6),
+          // Nút đóng
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

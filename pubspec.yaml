@@ -55,6 +55,10 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^5.2.3
 
+  # In hóa đơn PDF
+  pdf: ^3.10.8
+  printing: ^5.11.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

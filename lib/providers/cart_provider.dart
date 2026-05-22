@@ -168,7 +168,14 @@ class CartProvider extends ChangeNotifier {
 
       _lastOrder = await _orderService.createOrder(order);
       _isLoading = false;
-      clearCart();
+      // Lưu lại order trước khi xóa giỏ hàng
+      final savedOrder = _lastOrder;
+      _items = [];
+      _discount = 0;
+      _customerId = null;
+      _paymentMethod = 'CASH';
+      _lastOrder = savedOrder; // khôi phục để dialog có thể đọc
+      notifyListeners();
       return true;
     } catch (e) {
       _isLoading = false;

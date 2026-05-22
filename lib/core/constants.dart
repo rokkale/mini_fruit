@@ -1,6 +1,6 @@
 class AppConstants {
   static const String baseUrl =
-      'https://minifruit-backend-production-f318.up.railway.app/api';
+      'https://minifruit-backend-production-3a79.up.railway.app/api';
 
   // Endpoints
   static const String login = '/auth/login';

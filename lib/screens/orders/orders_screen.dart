@@ -411,8 +411,11 @@ class _CartBottomSheetState extends State<_CartBottomSheet> {
     if (!mounted) return;
 
     if (success) {
+      // Phải lấy lastOrder TRƯỚC khi pop — sau khi pop context bị detach,
+      // context.read() sẽ không còn truy cập được Provider
+      final order = cart.lastOrder;
       Navigator.pop(context);
-      _showSuccessDialog();
+      _showSuccessDialog(order);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -423,10 +426,7 @@ class _CartBottomSheetState extends State<_CartBottomSheet> {
     }
   }
 
-  void _showSuccessDialog() {
-    // Đọc lastOrder trước khi build dialog (cart đã bị clear nhưng lastOrder được giữ)
-    final order = context.read<CartProvider>().lastOrder;
-
+  void _showSuccessDialog(Order? order) {
     showDialog(
       context: context,
       barrierDismissible: false,

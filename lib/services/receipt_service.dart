@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -244,16 +243,31 @@ class ReceiptService {
           '&addInfo=${Uri.encodeComponent(addInfo)}'
           '&accountName=${Uri.encodeComponent(AppConstants.bankOwner)}';
 
-      final res = await _dio.get<List<int>>(
+      final res = await _dio.get<dynamic>(
         url,
-        options: Options(responseType: ResponseType.bytes),
+        options: Options(
+          responseType: ResponseType.bytes,
+          // Cho phép mọi status để tránh exception khi VietQR trả lỗi
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
 
       if (res.statusCode == 200 && res.data != null) {
-        return pw.MemoryImage(Uint8List.fromList(res.data!));
+        // Flutter Web: Dio có thể trả Uint8List hoặc List<int> tuỳ platform
+        final dynamic raw = res.data;
+        Uint8List bytes;
+        if (raw is Uint8List) {
+          bytes = raw;
+        } else if (raw is List) {
+          bytes = Uint8List.fromList(raw.cast<int>());
+        } else {
+          return null;
+        }
+        return pw.MemoryImage(bytes);
       }
-    } catch (_) {
-      // Offline hoặc CORS → bỏ qua, hóa đơn vẫn in được
+    } catch (e) {
+      // Offline hoặc CORS → bỏ qua, hóa đơn vẫn in được không có QR
+      debugPrint('VietQR fetch error: $e');
     }
     return null;
   }

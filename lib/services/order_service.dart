@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../models/order.dart';
@@ -21,6 +22,9 @@ class OrderService {
   Future<Order> getOrderById(int id) async {
     try {
       final response = await ApiClient.dio.get('${AppConstants.orders}/$id');
+      // DEBUG: xem backend trả về key gì cho danh sách sản phẩm
+      debugPrint('[OrderService] getOrderById($id) keys: ${(response.data as Map).keys.toList()}');
+      debugPrint('[OrderService] raw: ${response.data}');
       return Order.fromJson(response.data);
     } catch (e) {
       throw Exception('Không thể tải chi tiết đơn hàng');

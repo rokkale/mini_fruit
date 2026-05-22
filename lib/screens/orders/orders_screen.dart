@@ -788,11 +788,13 @@ class _HistoryScreenState extends State<_HistoryScreen> {
   }
 
   Future<void> _showOrderDetail(BuildContext context, Order order) async {
-    // Nếu chưa có danh sách sản phẩm → fetch từ API
     Order fullOrder = order;
+
+    // Nếu chưa có danh sách sản phẩm → thử fetch từ /orders/{id}/details
     if (order.details == null || order.details!.isEmpty) {
-      // Hiện loading trong khi fetch
       if (!context.mounted) return;
+
+      // Hiện loading spinner
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -814,9 +816,32 @@ class _HistoryScreenState extends State<_HistoryScreen> {
       );
 
       try {
-        fullOrder = await _orderService.getOrderById(order.orderId!);
+        // Thử endpoint /orders/{id}/details trước
+        final details =
+            await _orderService.getOrderDetails(order.orderId!);
+
+        if (details != null && details.isNotEmpty) {
+          // Có dữ liệu từ sub-endpoint → ghép vào order
+          fullOrder = Order(
+            orderId: order.orderId,
+            branchId: order.branchId,
+            branchName: order.branchName,
+            userId: order.userId,
+            customerId: order.customerId,
+            customerName: order.customerName,
+            totalAmount: order.totalAmount,
+            discount: order.discount,
+            freeAmount: order.freeAmount,
+            paymentMethod: order.paymentMethod,
+            createdAt: order.createdAt,
+            details: details,
+          );
+        } else {
+          // Fallback: gọi /orders/{id} (thường không có details, nhưng thử vẫn đúng)
+          fullOrder = await _orderService.getOrderById(order.orderId!);
+        }
       } catch (_) {
-        fullOrder = order; // fallback nếu API lỗi
+        fullOrder = order;
       }
 
       if (!context.mounted) return;

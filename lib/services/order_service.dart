@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import '../models/order.dart';
@@ -22,12 +21,47 @@ class OrderService {
   Future<Order> getOrderById(int id) async {
     try {
       final response = await ApiClient.dio.get('${AppConstants.orders}/$id');
-      // DEBUG: xem backend trả về key gì cho danh sách sản phẩm
-      debugPrint('[OrderService] getOrderById($id) keys: ${(response.data as Map).keys.toList()}');
-      debugPrint('[OrderService] raw: ${response.data}');
       return Order.fromJson(response.data);
     } catch (e) {
       throw Exception('Không thể tải chi tiết đơn hàng');
+    }
+  }
+
+  /// Lấy danh sách sản phẩm của đơn hàng từ endpoint phụ /orders/{id}/details
+  /// Trả về null nếu endpoint không tồn tại hoặc không có dữ liệu.
+  Future<List<OrderDetail>?> getOrderDetails(int id) async {
+    try {
+      final response =
+          await ApiClient.dio.get('${AppConstants.orders}/$id/details');
+      final data = response.data;
+      if (data == null) return null;
+      if (data is List) {
+        if (data.isEmpty) return null;
+        return data
+            .map((e) => OrderDetail.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      // Một số backend bọc trong {"data": [...]} hoặc {"orderDetails": [...]}
+      if (data is Map) {
+        for (final key in [
+          'data',
+          'details',
+          'orderDetails',
+          'order_details',
+          'items'
+        ]) {
+          final raw = data[key];
+          if (raw != null && raw is List && raw.isNotEmpty) {
+            return raw
+                .map((e) => OrderDetail.fromJson(e as Map<String, dynamic>))
+                .toList();
+          }
+        }
+      }
+      return null;
+    } catch (_) {
+      // Endpoint không tồn tại → trả null, không throw
+      return null;
     }
   }
 

@@ -1,7 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_client.dart';
 import '../core/constants.dart';
-import '../models/user.dart';
 
 class AuthService {
   // Đăng nhập
@@ -47,10 +46,18 @@ class AuthService {
     }
   }
 
-  // Đăng xuất
+  // Đăng xuất — CHỈ xóa thông tin xác thực, GIỮ LẠI shift data
+  // để nhân viên tiếp theo đăng nhập trên cùng thiết bị có thể
+  // tiếp tục ca đang mở mà không cần nhập lại tiền đầu ca.
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.remove(AppConstants.tokenKey);
+    await prefs.remove(AppConstants.usernameKey);
+    await prefs.remove(AppConstants.roleKey);
+    await prefs.remove(AppConstants.branchIdKey);
+    await prefs.remove(AppConstants.userIdKey);
+    // shiftOpenKey / shiftStartingCashKey / shiftStartTimeKey / shiftBranchIdKey
+    // được GIỮ LẠI → ca làm việc gắn với thiết bị (chi nhánh), không gắn với user
   }
 
   // Kiểm tra đã đăng nhập chưa

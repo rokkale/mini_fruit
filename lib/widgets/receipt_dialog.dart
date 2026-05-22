@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../core/app_widgets.dart';
-import '../core/constants.dart';
 import '../core/theme.dart';
 import '../models/order.dart';
+import '../providers/store_settings_provider.dart';
 import '../services/receipt_service.dart';
 
 /// Hiển thị hóa đơn sau khi thanh toán thành công, hoặc xem lại lịch sử.
@@ -27,13 +28,15 @@ class ReceiptDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Đọc cài đặt cửa hàng từ Provider (Admin có thể thay đổi qua Cài đặt)
+    final cfg = context.watch<StoreSettingsProvider>().settings;
     final fmt = NumberFormat.currency(locale: 'vi_VN', symbol: '');
     final isTransfer = order.paymentMethod == 'TRANSFER';
     final amount = (order.freeAmount ?? order.totalAmount).toInt();
     final addInfo = Uri.encodeComponent('DH${order.orderId ?? ""}');
-    final ownerEncoded = Uri.encodeComponent(AppConstants.bankOwner);
+    final ownerEncoded = Uri.encodeComponent(cfg.bankOwner);
     final qrUrl = 'https://img.vietqr.io/image/'
-        '${AppConstants.bankBin}-${AppConstants.bankAccount}-compact2.png'
+        '${cfg.bankBin}-${cfg.bankAccount}-compact2.png'
         '?amount=$amount&addInfo=$addInfo&accountName=$ownerEncoded';
 
     return Dialog(
@@ -58,7 +61,7 @@ class ReceiptDialog extends StatelessWidget {
                       color: Colors.white, size: 32),
                   const SizedBox(height: 6),
                   Text(
-                    AppConstants.storeName,
+                    cfg.storeName,
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -167,7 +170,30 @@ class ReceiptDialog extends StatelessWidget {
                     ),
 
                     // ── QR chuyển khoản (ẩn khi xem lịch sử) ────────────
-                    if (isTransfer && showQr) ...[
+                    if (isTransfer && showQr && !cfg.canGenerateQr) ...[
+                      const Divider(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.warningContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: AppTheme.warning, size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Chưa cấu hình tài khoản ngân hàng.\nAdmin vào Cài đặt → Thông tin cửa hàng để thiết lập.',
+                                style: TextStyle(fontSize: 12, color: AppTheme.warning),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (isTransfer && showQr && cfg.canGenerateQr) ...[
                       const Divider(height: 24),
                       const Center(
                         child: Text(
@@ -225,9 +251,9 @@ class ReceiptDialog extends StatelessWidget {
                         ),
                         child: Column(
                           children: [
-                            _bankRow('Ngân hàng:', AppConstants.bankId),
-                            _bankRow('Số TK:', AppConstants.bankAccount),
-                            _bankRow('Chủ TK:', AppConstants.bankOwner),
+                            _bankRow('Ngân hàng:', cfg.bankId),
+                            _bankRow('Số TK:', cfg.bankAccount),
+                            _bankRow('Chủ TK:', cfg.bankOwner),
                             _bankRow(
                                 'Nội dung:', 'DH${order.orderId ?? ""}'),
                             _bankRow(

@@ -25,11 +25,20 @@ class AppConstants {
   static const String shiftStartTimeKey = 'shift_start_time';
   static const String shiftBranchIdKey = 'shift_branch_id';
 
-  // Thông tin cửa hàng & tài khoản ngân hàng (chuyển khoản)
+  // ── Giá trị mặc định (dùng khi chưa cấu hình qua màn hình Cài đặt) ──
   static const String storeName    = 'Mini Fruit';
-  static const String storeAddress = ''; // Địa chỉ cửa hàng (tuỳ chỉnh)
-  static const String bankId       = 'MB';       // Tên ngân hàng hiển thị
-  static const String bankBin      = '970422';   // BIN MB Bank – tra tại img.vietqr.io/image/list
-  static const String bankAccount  = '0123456789'; // ← Thay bằng STK thật
-  static const String bankOwner    = 'MINI FRUIT'; // ← Thay bằng tên chủ TK thật
+  static const String storeAddress = '';
+  static const String bankId       = 'BIDV';
+  static const String bankBin      = '970418';
+  static const String bankAccount  = '';
+  static const String bankOwner    = '';
+
+  // ── SharedPreferences keys cho cài đặt cửa hàng (Admin tự nhập) ──
+  static const String settingsStoreNameKey    = 'cfg_store_name';
+  static const String settingsStoreAddressKey = 'cfg_store_address';
+  static const String settingsBankIdKey       = 'cfg_bank_id';
+  static const String settingsBankBinKey      = 'cfg_bank_bin';
+  static const String settingsBankAccountKey  = 'cfg_bank_account';
+  static const String settingsBankOwnerKey    = 'cfg_bank_owner';
+  static const String settingsSePayTokenKey   = 'cfg_sepay_token';
 }

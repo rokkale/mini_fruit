@@ -4,6 +4,7 @@ import 'core/api_client.dart';
 import 'core/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
+import 'providers/store_settings_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 
@@ -22,6 +23,7 @@ class MiniFruitApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => StoreSettingsProvider()),
       ],
       child: MaterialApp(
         title: 'MiniFruit',
@@ -45,9 +47,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
-    // Kiểm tra token ngay khi mở app
     Future.microtask(() {
+      // Kiểm tra token và nạp cài đặt cửa hàng song song
       context.read<AuthProvider>().checkAuthStatus();
+      context.read<StoreSettingsProvider>().load();
     });
   }
 

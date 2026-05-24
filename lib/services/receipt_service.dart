@@ -1,22 +1,21 @@
-import 'package:flutter/foundation.dart';
-import 'package:dio/dio.dart';
+import 'dart:typed_data';
+
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-import '../core/constants.dart';
 import '../models/order.dart';
+import '../models/store_settings.dart';
 
 class ReceiptService {
   final _currency = NumberFormat.currency(locale: 'vi_VN', symbol: '');
-  final _dio = Dio();
 
   // ─────────────────────────────────────────────────────────────
   // Public: mở print-preview / browser print dialog
   // ─────────────────────────────────────────────────────────────
-  Future<void> printReceipt(Order order) async {
-    final bytes = await _buildPdf(order);
+  Future<void> printReceipt(Order order, StoreSettings cfg) async {
+    final bytes = await _buildPdf(order, cfg);
     await Printing.layoutPdf(
       onLayout: (_) async => bytes,
       name: 'HoaDon_${order.orderId ?? ""}',
@@ -26,7 +25,7 @@ class ReceiptService {
   // ─────────────────────────────────────────────────────────────
   // Build PDF
   // ─────────────────────────────────────────────────────────────
-  Future<Uint8List> _buildPdf(Order order) async {
+  Future<Uint8List> _buildPdf(Order order, StoreSettings cfg) async {
     final doc   = pw.Document();
     final font  = await PdfGoogleFonts.notoSansRegular();
     final fontB = await PdfGoogleFonts.notoSansBold();
@@ -35,11 +34,16 @@ class ReceiptService {
     final amount     = (order.freeAmount ?? order.totalAmount).toInt();
     final addInfo    = 'DH${order.orderId ?? ""}';
 
-    // Lấy ảnh VietQR nếu thanh toán chuyển khoản
-    pw.ImageProvider? qrImage;
-    if (isTransfer) {
-      qrImage = await _fetchVietQR(amount, addInfo);
-    }
+    // Tạo chuỗi VietQR EMV cục bộ — không cần network, không bị CORS
+    final String? qrData = (isTransfer && cfg.canGenerateQr)
+        ? _buildVietQrString(
+            bankBin:     cfg.bankBin,
+            bankAccount: cfg.bankAccount,
+            accountName: cfg.bankOwner,
+            amount:      amount,
+            addInfo:     addInfo,
+          )
+        : null;
 
     doc.addPage(
       pw.Page(
@@ -55,7 +59,7 @@ class ReceiptService {
             // ── HEADER ───────────────────────────────────────
             pw.Center(
               child: pw.Text(
-                AppConstants.storeName,
+                cfg.storeName,
                 style: pw.TextStyle(font: fontB, fontSize: 15),
               ),
             ),
@@ -67,10 +71,10 @@ class ReceiptService {
                       color: PdfColors.grey700),
                 ),
               ),
-            if (AppConstants.storeAddress.isNotEmpty)
+            if (cfg.storeAddress.isNotEmpty)
               pw.Center(
                 child: pw.Text(
-                  AppConstants.storeAddress,
+                  cfg.storeAddress,
                   style: pw.TextStyle(font: font, fontSize: 9,
                       color: PdfColors.grey700),
                 ),
@@ -163,15 +167,20 @@ class ReceiptService {
               ),
               pw.SizedBox(height: 6),
 
-              // Ảnh QR VietQR (nếu fetch được)
-              if (qrImage != null)
+              // Vẽ QR trực tiếp từ chuỗi VietQR EMV — không cần network
+              if (qrData != null)
                 pw.Center(
-                  child: pw.Image(qrImage, width: 150, height: 150),
+                  child: pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(),
+                    data: qrData,
+                    width: 150,
+                    height: 150,
+                  ),
                 )
               else
                 pw.Center(
                   child: pw.Text(
-                    '(Không tải được mã QR — vui lòng chuyển khoản thủ công)',
+                    '(Chưa cấu hình tài khoản ngân hàng)',
                     style: pw.TextStyle(font: font, fontSize: 8,
                         color: PdfColors.grey),
                     textAlign: pw.TextAlign.center,
@@ -180,15 +189,15 @@ class ReceiptService {
 
               pw.SizedBox(height: 6),
               pw.Center(
-                child: pw.Text(AppConstants.bankId,
+                child: pw.Text(cfg.bankId,
                     style: pw.TextStyle(font: fontB, fontSize: 11)),
               ),
               pw.Center(
-                child: pw.Text(AppConstants.bankAccount,
+                child: pw.Text(cfg.bankAccount,
                     style: pw.TextStyle(font: fontB, fontSize: 12)),
               ),
               pw.Center(
-                child: pw.Text(AppConstants.bankOwner,
+                child: pw.Text(cfg.bankOwner,
                     style: pw.TextStyle(font: font, fontSize: 10)),
               ),
               pw.SizedBox(height: 3),
@@ -232,44 +241,53 @@ class ReceiptService {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Fetch ảnh VietQR từ API công khai
+  // Tạo chuỗi VietQR theo chuẩn EMVCo — không cần network
   // ─────────────────────────────────────────────────────────────
-  Future<pw.ImageProvider?> _fetchVietQR(int amount, String addInfo) async {
-    try {
-      final url =
-          'https://img.vietqr.io/image/'
-          '${AppConstants.bankBin}-${AppConstants.bankAccount}-compact2.png'
-          '?amount=$amount'
-          '&addInfo=${Uri.encodeComponent(addInfo)}'
-          '&accountName=${Uri.encodeComponent(AppConstants.bankOwner)}';
+  String _buildVietQrString({
+    required String bankBin,
+    required String bankAccount,
+    required String accountName,
+    required int amount,
+    required String addInfo,
+  }) {
+    String tlv(String tag, String value) =>
+        '$tag${value.length.toString().padLeft(2, '0')}$value';
 
-      final res = await _dio.get<dynamic>(
-        url,
-        options: Options(
-          responseType: ResponseType.bytes,
-          // Cho phép mọi status để tránh exception khi VietQR trả lỗi
-          validateStatus: (status) => status != null && status < 500,
-        ),
-      );
+    // Tag 38 — Merchant Account Info (VietQR / NAPAS)
+    final guid        = tlv('00', 'A000000727');
+    final beneficiary = tlv('01', tlv('00', bankBin) + tlv('01', bankAccount));
+    final service     = tlv('02', 'QRIBFTTA');
+    final merchantInfo = tlv('38', guid + beneficiary + service);
 
-      if (res.statusCode == 200 && res.data != null) {
-        // Flutter Web: Dio có thể trả Uint8List hoặc List<int> tuỳ platform
-        final dynamic raw = res.data;
-        Uint8List bytes;
-        if (raw is Uint8List) {
-          bytes = raw;
-        } else if (raw is List) {
-          bytes = Uint8List.fromList(raw.cast<int>());
-        } else {
-          return null;
-        }
-        return pw.MemoryImage(bytes);
+    // Tag 62 — Additional Data
+    final additionalData = tlv('62', tlv('05', addInfo));
+
+    final name = accountName.isEmpty ? 'Mini Fruit' : accountName;
+
+    var qr = '';
+    qr += tlv('00', '01');         // Payload Format Indicator
+    qr += tlv('01', '12');         // Dynamic QR
+    qr += merchantInfo;            // Merchant Account Info
+    qr += tlv('52', '0000');       // MCC
+    qr += tlv('53', '704');        // VND
+    qr += tlv('54', '$amount');    // Amount
+    qr += tlv('58', 'VN');         // Country
+    qr += tlv('59', name);         // Merchant Name
+    qr += tlv('60', 'Viet Nam');   // City
+    qr += additionalData;
+    qr += '6304';                  // CRC placeholder
+
+    // CRC16/CCITT (polynomial 0x1021, init 0xFFFF)
+    int crc = 0xFFFF;
+    for (int i = 0; i < qr.length; i++) {
+      crc ^= qr.codeUnitAt(i) << 8;
+      for (int j = 0; j < 8; j++) {
+        crc = ((crc & 0x8000) != 0)
+            ? ((crc << 1) ^ 0x1021) & 0xFFFF
+            : (crc << 1) & 0xFFFF;
       }
-    } catch (e) {
-      // Offline hoặc CORS → bỏ qua, hóa đơn vẫn in được không có QR
-      debugPrint('VietQR fetch error: $e');
     }
-    return null;
+    return qr + crc.toRadixString(16).toUpperCase().padLeft(4, '0');
   }
 
   // ─────────────────────────────────────────────────────────────

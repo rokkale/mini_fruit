@@ -297,7 +297,7 @@ class ReceiptDialog extends StatelessWidget {
                       ),
                       onPressed: () {
                         Navigator.pop(context);
-                        ReceiptService().printReceipt(order);
+                        ReceiptService().printReceipt(order, cfg);
                       },
                     ),
                   ),

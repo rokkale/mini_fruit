@@ -952,7 +952,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _filterProducts,
                     );
                   },
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: const TextStyle(color: Colors.black, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Tìm tên, mã vạch...',
                     hintStyle: TextStyle(
